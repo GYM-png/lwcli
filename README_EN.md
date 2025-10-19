@@ -146,7 +146,7 @@ Please ensure your code meets the following requirements:
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE). See the [LICENSE](https://github.com/GYM-png/lwcli/blob/master/LICENSE) file for details.
+This project is licensed under the [MIT License](LICENSE). See the [LICENSE](https://github.com/GYM-png/lwcli/blob/master/LICENSE.txt) file for details.
 
 ## Contact
 

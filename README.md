@@ -146,7 +146,7 @@ int main(void) {
 
 ## 许可证
 
-此项目采用 [MIT License](LICENSE)。详见 [LICENSE](https://github.com/GYM-png/lwcli/blob/master/LICENSE) 文件。
+此项目采用 [MIT License](LICENSE)。详见 [LICENSE](https://github.com/GYM-png/lwcli/blob/master/LICENSE.txt) 文件。
 
 ## 联系方式
 
