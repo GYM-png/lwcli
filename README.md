@@ -1,11 +1,12 @@
-<xaiArtifact artifact_id="e9f01415-c586-4703-8f57-4dd60fedba18" artifact_version_id="4560cc73-bd28-429e-ae3e-106075ede1df" title="README.md" contentType="text/markdown">
 
 # lwcli
 
 [![GitHub stars](https://img.shields.io/github/stars/GYM-png/lwcli?style=social)](https://github.com/GYM-png/lwcli/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/GYM-png/lwcli?style=social)](https://github.com/GYM-png/lwcli/network/members)
 [![GitHub issues](https://img.shields.io/github/issues/GYM-png/lwcli)](https://github.com/GYM-png/lwcli/issues)
-[![License](https://img.shields.io/github/license/GYM-png/lwcli)](https://github.com/GYM-png/lwcli/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/GYM-png/lwcli)](https://github.com/GYM-png/lwcli/blob/master/LICENSE)
+
+[中文](https://github.com/GYM-png/lwcli/blob/master/README.md)|[English](https://github.com/GYM-png/lwcli/blob/master/README_EN.md)
 
 ## 概述
 
@@ -145,7 +146,7 @@ int main(void) {
 
 ## 许可证
 
-此项目采用 [MIT License](LICENSE)。详见 [LICENSE](https://github.com/GYM-png/lwcli/blob/main/LICENSE) 文件。
+此项目采用 [MIT License](LICENSE)。详见 [LICENSE](https://github.com/GYM-png/lwcli/blob/master/LICENSE) 文件。
 
 ## 联系方式
 
@@ -155,4 +156,3 @@ int main(void) {
 
 感谢您的关注与支持！🚀
 
-</xaiArtifact>
