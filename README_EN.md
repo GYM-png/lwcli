@@ -18,8 +18,8 @@ Current version: `V0.0.1`
 
 - **Lightweight Design**: Minimal resource usage, tailored for embedded systems.
 - **Command Registration**: Supports dynamic registration of user-defined commands with help messages.
-- **Parameter Parsing**: Automatically parses command parameters, supporting up to `LWCLI_COMMAND_STR_MAX_LENGTH` (10) bytes for command names.
-- **Command History**: Stores up to `LWCLI_HISTORY_COMMAND_NUM` (10) command history entries, using approximately `LWCLI_HISTORY_COMMAND_NUM * LWCLI_RECEIVE_BUFFER_SIZE` bytes of memory.
+- **Parameter Parsing**: Automatically parses command parameters, supporting up to `LWCLI_COMMAND_STR_MAX_LENGTH` bytes for command names.
+- **Command History**: Stores up to `LWCLI_HISTORY_COMMAND_NUM` command history entries, using approximately `LWCLI_HISTORY_COMMAND_NUM * LWCLI_RECEIVE_BUFFER_SIZE` bytes of memory.
 - **Cross-Platform**: Hardware abstraction layer (`lwcli_port.c`) supports various hardware platforms with serial/USB interfaces.
 - **FreeRTOS Integration**: Provides task creation and processing for seamless integration in multi-tasking embedded environments.
 - **Error Handling**: Includes built-in help command and unrecognized command prompts.
@@ -113,23 +113,36 @@ The `lwcli_config.h` file defines the following configuration parameters:
 | Parameter Name                    | Default Value | Description                              |
 |-----------------------------------|---------------|------------------------------------------|
 | `LWCLI_COMMAND_STR_MAX_LENGTH`    | 10            | Maximum command string length (excluding parameters) |
-| `LWCLI_HELP_STR_MAX_LENGTH`       | 100           | Maximum help string length               |
-| `LWCLI_RECEIVE_BUFFER_SIZE`       | 50            | Receive buffer size                      |
+| `LWCLI_HELP_STR_MAX_LENGTH`       | 100           | Maximum help string length                |
+| `LWCLI_RECEIVE_BUFFER_SIZE`       | 50            | Receive buffer size                       |
 | `LWCLI_HISTORY_COMMAND_NUM`       | 10            | Maximum number of history commands (0 to disable) |
-| `LWCLI_DELETE_CHAR`               | 0x7F          | Delete character                         |
-| `LWCLI_BACK_CHAR`                 | '\177'        | Backspace character                      |
+| `LWCLI_SHELL_DELETE_CHAR`         | 0x7F          | Delete character                          |
+| `LWCLI_SHELL_BACK_CHAR`           | '\177'        | Backspace character                       |
+| `LWCLI_SHELL_CURSOR_RIGHT_STRING` | "\033[C"      | ANSI sequence for cursor right            |
+| `LWCLI_SHELL_CURSOR_LEFT_STRING`  | "\033[D"      | ANSI sequence for cursor left             |
+| `LWCLI_SHELL_CLEAR_STRING`        | "\x1B[2J"     | ANSI sequence for screen clear            |
+| `LWCLI_SHELL_CURSOR_TO_ZERO_STRING`| "\x1B[0;0H"  | ANSI sequence to move cursor to (0,0)     |
 | `LWCLI_COMMAND_FIND_FAIL_MESSAGE` | "Command not recognised. Enter 'help' to view a list of available commands.\r\n" | Unrecognized command message |
 
 Modify these parameters to suit your needs, keeping memory constraints in mind.
 
 ## Project Structure
 
-- `lwcli.h`: User header file defining CLI interfaces and version.
-- `lwcli_config.h`: Configuration parameter file.
-- `lwcli.c`: Core command parsing and processing logic.
-- `lwcli_task.c`: FreeRTOS task implementation for character reception and parsing.
-- `lwcli_port.c`: Hardware abstraction layer, requiring user-implemented hardware interfaces.
-- `main.c`: Sample code demonstrating lwcli initialization and command registration (for interface demonstration only, not executable without hardware).
+```plain
+lwcli/
+├── src/                # Source files required for porting
+│   ├── lwcli.c         # Core command parsing logic
+│   ├── lwcli_task.c    # FreeRTOS task implementation
+│   └── lwcli_port.c    # Hardware abstraction layer (user-implemented)
+├── inc/                # Header files required for porting
+│   ├── lwcli.h         # User interface header
+│   └── lwcli_config.h  # Configuration header
+├── example/            # Usage examples
+│   └── main.c          # Example code (interface demo only, not directly runnable)
+├── LICENSE             # MIT License
+├── README.md           # Chinese documentation
+└── README_EN.md        # English documentation
+```
 
 ## Contributing
 

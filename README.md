@@ -18,8 +18,9 @@
 
 - **轻量级设计**：占用资源少，适合嵌入式系统。
 - **命令注册**：支持动态注册用户自定义命令及帮助信息。
-- **参数解析**：自动解析命令参数，最大支持 `LWCLI_COMMAND_STR_MAX_LENGTH` (10) 字节的命令长度。
-- **历史记录**：支持最多 `LWCLI_HISTORY_COMMAND_NUM` (10) 条命令历史记录，占用约 `LWCLI_HISTORY_COMMAND_NUM * LWCLI_RECEIVE_BUFFER_SIZE` 字节内存。
+- **参数解析**：自动解析命令参数，最大支持 `LWCLI_COMMAND_STR_MAX_LENGTH` 字节的命令长度。
+- **历史记录**：支持最多 `LWCLI_HISTORY_COMMAND_NUM` 条命令历史记录，占用约 `LWCLI_HISTORY_COMMAND_NUM * LWCLI_RECEIVE_BUFFER_SIZE` 字节内存。
+- **光标编辑**: 支持左右方向键移动光标，实现命令行编辑（插入、删除字符）。
 - **跨平台**：通过硬件抽象层 (`lwcli_port.c`) 支持不同硬件平台的串口/USB 接口。
 - **FreeRTOS 集成**：提供任务创建和处理功能，易于嵌入式多任务环境。
 - **错误提示**：内置帮助命令和未识别命令提示。
@@ -112,24 +113,37 @@ int main(void) {
 
 | 参数名                        | 默认值 | 描述                              |
 |-------------------------------|--------|-----------------------------------|
-| `LWCLI_COMMAND_STR_MAX_LENGTH` | 10     | 命令字符串最大长度（不含参数）    |
-| `LWCLI_HELP_STR_MAX_LENGTH`   | 100    | 帮助字符串最大长度                |
-| `LWCLI_RECEIVE_BUFFER_SIZE`   | 50     | 接收缓冲区大小                    |
-| `LWCLI_HISTORY_COMMAND_NUM`   | 10     | 历史命令最大数量（0 禁用历史记录）|
-| `LWCLI_DELETE_CHAR`           | 0x7F   | 删除字符                          |
-| `LWCLI_BACK_CHAR`             | '\177' | 退格字符                          |
+| `LWCLI_COMMAND_STR_MAX_LENGTH` | 10           | 命令字符串最大长度（不含参数）    |
+| `LWCLI_HELP_STR_MAX_LENGTH`        | 100      | 帮助字符串最大长度                |
+| `LWCLI_RECEIVE_BUFFER_SIZE`        | 50       | 接收缓冲区大小                    |
+| `LWCLI_HISTORY_COMMAND_NUM`        | 10       | 历史命令最大数量（0 禁用历史记录）|
+| `LWCLI_SHELL_DELETE_CHAR`          | 0x7F     | 删除字符                          |
+| `LWCLI_SHELL_BACK_CHAR`            | '\177'   | 退格字符                          |
+| `LWCLI_SHELL_CURSOR_RIGHT_STRING`  | "\033[C"   | 光标右移 ANSI 序列            |
+| `LWCLI_SHELL_CURSOR_LEFT_STRING`   | "\033[D"   | 光标左移 ANSI 序列           |
+| `LWCLI_SHELL_CLEAR_STRING`            | "\x1B[2J"   | 清屏 ANSI 序列      |
+| `LWCLI_SHELL_CURSOR_TO_ZERO_STRING`   | "\x1B[0;0H"   | 光标移至 (0,0) 位置      |
 | `LWCLI_COMMAND_FIND_FAIL_MESSAGE` | "Command not recognised. Enter 'help' to view a list of available commands.\r\n" | 命令未找到提示 |
 
 修改这些参数以适配您的需求，但需注意内存占用。
 
 ## 项目结构
 
-- `lwcli.h`: 用户头文件，定义 CLI 接口和版本。
-- `lwcli_config.h`: 配置参数文件。
-- `lwcli.c`: 核心命令解析和处理逻辑。
-- `lwcli_task.c`: FreeRTOS 任务实现，处理字符接收和解析。
-- `lwcli_port.c`: 硬件抽象层，需用户实现硬件相关接口。
-- `main.c`: 示例代码，展示 lwcli 初始化和命令注册（仅用于接口演示，无法直接运行）。
+```plain
+lwcli/
+├── src/                # 移植所需源文件
+│   ├── lwcli.c         # 核心命令解析逻辑
+│   ├── lwcli_task.c    # FreeRTOS 任务实现
+│   └── lwcli_port.c    # 硬件抽象层（需用户实现）
+├── inc/                # 移植所需头文件
+│   ├── lwcli.h         # 用户接口头文件
+│   └── lwcli_config.h  # 配置参数头文件
+├── example/            # 使用示例
+│   └── main.c          # 示例代码（仅演示接口，无法直接运行）
+├── LICENSE             # MIT 许可证
+├── README.md           # 中文文档
+└── README_EN.md        # 英文文档
+```
 
 ## 贡献指南
 

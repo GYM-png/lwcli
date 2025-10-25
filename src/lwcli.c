@@ -55,6 +55,7 @@ static bool findHistoryEnable = false;
 
 /** 静态函数声明 **/
 static void lwcli_help(char **command_arry, uint8_t parameter_num);
+static void lwcli_clear(char **command_arry, uint8_t parameter_num);
 static uint8_t lwcli_find_parameters(const char *command_string, char **parameter_arry);
 static uint8_t lwcli_get_parameter_number(const char *command_string);
 static void lwcli_process_command(char *cmdStr);
@@ -76,8 +77,24 @@ extern void lwcli_output_string(char *output_string, uint16_t string_len);
  */
 void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback)
 {
-    if (cmdListHead == NULL)
+    if (strlen(cmdStr) > LWCLI_COMMAND_STR_MAX_LENGTH)
     {
+        lwcli_output_string("command string too long please modify LWCLI_COMMAND_STR_MAX_LENGTH \r\n", strlen("command string too long please modify LWCLI_COMMAND_STR_MAX_LENGTH \r\n"));
+        return;
+    }
+    if (strlen(helpStr) > LWCLI_HELP_STR_MAX_LENGTH)
+    {
+        lwcli_output_string("help string too long please modify LWCLI_HELP_STR_MAX_LENGTH \r\n", strlen("help string too long please modify LWCLI_HELP_STR_MAX_LENGTH \r\n"));
+        return;
+    }
+    if (cmdStr == NULL || helpStr == NULL || userCallback == NULL)
+    {
+        lwcli_output_string("command string or help string or callback function is null\r\n", strlen("command string or help string or callback function is null\r\n"));
+        return;
+    }
+    if (cmdListHead == NULL)    // 第一次调用时 做初始化
+    {
+        /** 初始化头节点并绑定帮助命令 */
         cmdListHead = (cmdList_t *)lwcli_malloc(sizeof(cmdList_t));
         if (cmdListHead == NULL)
         {
@@ -88,6 +105,21 @@ void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback)
         cmdListHead->cmdStr[4] = '\0';
         cmdListHead->cmdFunc = lwcli_help;
         cmdListHead->next = NULL;
+
+        /** 注册清屏命令 */
+        cmdList_t *clearNode = (cmdList_t *)lwcli_malloc(sizeof(cmdList_t));
+        if (clearNode == NULL)
+        {
+            lwcli_output_string("lwcli malloc error\r\n", strlen("lwcli malloc error\r\n"));
+            return;
+        }
+        memcpy(clearNode->cmdStr, "clear", strlen("clear"));
+        memcpy(clearNode->helpStr, "clear screen", strlen("clear screen"));
+        clearNode->cmdStr[5] = '\0';
+        clearNode->helpStr[12] = '\0';
+        clearNode->cmdFunc = lwcli_clear;
+        clearNode->next = NULL;
+        cmdListHead->next = clearNode;
 
         /** 初始化历史记录缓冲区 */
         #if (LWCLI_HISTORY_COMMAND_NUM > 0)
@@ -118,11 +150,8 @@ void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback)
     }
     memcpy(newNode->cmdStr, cmdStr, strlen(cmdStr));
     newNode->cmdStr[strlen(cmdStr)] = '\0';
-    if (helpStr != NULL && strlen(helpStr) < LWCLI_HELP_STR_MAX_LENGTH)
-    {
-        memcpy(newNode->helpStr, helpStr, strlen(helpStr));
-        newNode->helpStr[strlen(helpStr)] = '\0';
-    }
+    memcpy(newNode->helpStr, helpStr, strlen(helpStr));
+    newNode->helpStr[strlen(helpStr)] = '\0';
     newNode->cmdFunc = userCallback;
     newNode->next = NULL;
     while (pnode->next)
@@ -144,7 +173,11 @@ static void lwcli_help(char **command_arry, uint8_t parameter_num)
         if (node->helpStr[0] != '\0')
         {
             lwcli_output_string(node->cmdStr, strlen(node->cmdStr));
-            lwcli_output_string(": \t\t ", strlen(": \t\t "));
+            lwcli_output_char(':');
+            for (uint16_t i = 0; i < (LWCLI_COMMAND_STR_MAX_LENGTH - (strlen(node->cmdStr) + 1) + 4); i++)  // 打印空格对齐
+            {
+                lwcli_output_char(' ');
+            }
             lwcli_output_string(node->helpStr, strlen(node->helpStr));
             lwcli_output_string("\r\n\r\n", strlen("\r\n\r\n"));
         }
@@ -152,6 +185,14 @@ static void lwcli_help(char **command_arry, uint8_t parameter_num)
     }
 }
 
+/**
+ * @brief 清屏命令
+ */
+static void lwcli_clear(char **command_arry, uint8_t parameter_num)
+{
+    lwcli_output_string(LWCLI_SHELL_CLEAR_STRING, strlen(LWCLI_SHELL_CLEAR_STRING));
+    lwcli_output_string(LWCLI_SHELL_CURSOR_TO_ZERO_STRING, strlen(LWCLI_SHELL_CURSOR_TO_ZERO_STRING));
+}
 
 static char cmdStrBuffer[LWCLI_RECEIVE_BUFFER_SIZE] = {0};
 static uint16_t cmdStrBufferPos = 0;
@@ -164,7 +205,10 @@ void lwcli_process_receive_char(char revChar)
 {
 #if (LWCLI_HISTORY_COMMAND_NUM > 0)
     static char findHistoryKey[3] = {0, 0, 0};
+    static char cursorMoveKey[3] = {0, 0, 0};
     static uint8_t findHistoryKeyPos = 0;
+    static uint8_t cursorMoveKeyPos = 0;
+    static uint16_t cursorPosNow = 0;
 #endif
     if (revChar == '\r' || revChar == '\n')
     {
@@ -173,56 +217,140 @@ void lwcli_process_receive_char(char revChar)
         lwcli_process_command(cmdStrBuffer);
         memset(cmdStrBuffer, 0, LWCLI_RECEIVE_BUFFER_SIZE);
         cmdStrBufferPos = 0;
+        cursorPosNow = cmdStrBufferPos;
         findHistoryEnable = true;
         #if (LWCLI_HISTORY_COMMAND_NUM > 0)
         lwcli_history_list_update();
         #endif
     }
-    else if (revChar == '\b' || revChar == LWCLI_BACK_CHAR)
+    else if ((revChar == '\b' || revChar == LWCLI_SHELL_BACK_CHAR) && cmdStrBufferPos > 0)
     {
-        if (cmdStrBufferPos > 0)
+        if (cursorPosNow == cmdStrBufferPos)
         {
             cmdStrBuffer[--cmdStrBufferPos] = '\0';
             lwcli_output_char(revChar);
+            findHistoryEnable = (cmdStrBufferPos == 0) ? true : false;
+            cursorPosNow = cmdStrBufferPos;
         }
-        if (cmdStrBufferPos == 0)
+        else if (cursorPosNow > 0)
         {
-            findHistoryEnable = true;
+            for (size_t i = cursorPosNow - 1; i < cmdStrBufferPos; i++) // 字符串缓存处理，保证cmdStrBuffer中存储的字符串和屏幕一致
+            {
+                cmdStrBuffer[i] = cmdStrBuffer[i + 1];
+            }
+            for (size_t i = 0; i < cmdStrBufferPos - cursorPosNow; i++) // 光标移动到最后一个字符后面
+            {
+                lwcli_output_string(LWCLI_SHELL_CURSOR_RIGHT_STRING, strlen(LWCLI_SHELL_CURSOR_RIGHT_STRING));
+            }
+            for (size_t i = 0; i < cmdStrBufferPos - cursorPosNow + 1; i++) // 控制屏幕删除，直到删除到需要删除的字符
+            {
+                lwcli_output_char(LWCLI_SHELL_DELETE_CHAR);
+            }
+            for (size_t i = cursorPosNow - 1; i < cmdStrBufferPos; i++) // 将多删的字符输出
+            {
+                lwcli_output_char(cmdStrBuffer[i]);
+            }
+            for (size_t i = 0; i < cmdStrBufferPos - cursorPosNow; i++) // 移动光标到正确位置
+            {
+                lwcli_output_string(LWCLI_SHELL_CURSOR_LEFT_STRING, strlen(LWCLI_SHELL_CURSOR_LEFT_STRING));
+            }
+            cmdStrBufferPos--;
+            cursorPosNow--;
+        }
+    }
+    else if (revChar == 0x1B || revChar == 0x5B || revChar == 0x41 || revChar == 0x42 || revChar == 0x43 || revChar == 0x44)
+    {
+        if (revChar == 0x1B || revChar == 0x5B)
+        {
+            findHistoryKey[findHistoryKeyPos++] = revChar;
+            cursorMoveKey[cursorMoveKeyPos++] = revChar;
         }
         else
         {
-            findHistoryEnable = false;
-        }
-    }
-#if (LWCLI_HISTORY_COMMAND_NUM > 0)
-    else if (revChar == 0x1B || revChar == 0x5B || revChar == 0x41 || revChar == 0x42)
-    {
-        if (findHistoryEnable)
-        {
-            findHistoryKey[findHistoryKeyPos++] = revChar;
-            if (findHistoryKeyPos == 3)
+            if (revChar == 0x43 || revChar == 0x44)
             {
-                if (findHistoryKey[0] == 0x1B && findHistoryKey[1] == 0x5B && findHistoryKey[2] == 0x41 && findHistoryEnable)
+                cursorMoveKey[cursorMoveKeyPos++] = revChar;
+                if (cursorMoveKeyPos == 3)
                 {
-                    lwcli_history_command_up(cmdStrBuffer);
-                    lwcli_output_string(cmdStrBuffer, strlen(cmdStrBuffer));
+                    findHistoryKeyPos = 0;
+                    if (cursorMoveKey[0] == 0x1B && cursorMoveKey[1] == 0x5B && cursorMoveKey[2] == 0x44)
+                    {
+                        if (cursorPosNow > 0)
+                        {
+                            cursorPosNow--;
+                            lwcli_output_string(LWCLI_SHELL_CURSOR_LEFT_STRING, strlen(LWCLI_SHELL_CURSOR_LEFT_STRING));
+                        }
+                    }
+                    else if (cursorMoveKey[0] == 0x1B && cursorMoveKey[1] == 0x5B && cursorMoveKey[2] == 0x43)
+                    {
+                        if (cursorPosNow < cmdStrBufferPos)
+                        {
+                            cursorPosNow++;
+                            lwcli_output_string(LWCLI_SHELL_CURSOR_RIGHT_STRING, strlen(LWCLI_SHELL_CURSOR_RIGHT_STRING));
+                        }
+                    }
+                    memset(cursorMoveKey, 0, 3);
+                    cursorMoveKeyPos = 0;
                 }
-                else if (findHistoryKey[0] == 0x1B && findHistoryKey[1] == 0x5B && findHistoryKey[2] == 0x42 && findHistoryEnable)
-                {
-                    lwcli_history_command_down(cmdStrBuffer);
-                    lwcli_output_string(cmdStrBuffer, strlen(cmdStrBuffer));
-                }
-                memset(findHistoryKey, 0, 3);
-                findHistoryKeyPos = 0;
             }
+#if (LWCLI_HISTORY_COMMAND_NUM > 0)
+            else
+            {
+                if (findHistoryEnable)
+                {
+                    findHistoryKey[findHistoryKeyPos++] = revChar;
+                    if (findHistoryKeyPos == 3)
+                    {
+                        cursorMoveKeyPos = 0;
+                        if (findHistoryKey[0] == 0x1B && findHistoryKey[1] == 0x5B && findHistoryKey[2] == 0x41 && findHistoryEnable)
+                        {
+                            lwcli_history_command_up(cmdStrBuffer);
+                            lwcli_output_string(cmdStrBuffer, strlen(cmdStrBuffer));
+                        }
+                        else if (findHistoryKey[0] == 0x1B && findHistoryKey[1] == 0x5B && findHistoryKey[2] == 0x42 && findHistoryEnable)
+                        {
+                            lwcli_history_command_down(cmdStrBuffer);
+                            lwcli_output_string(cmdStrBuffer, strlen(cmdStrBuffer));
+                        }
+                        memset(findHistoryKey, 0, 3);
+                        findHistoryKeyPos = 0;
+                        cursorPosNow = cmdStrBufferPos;
+                    }
+                }
+            }
+#endif // LWCLI_HISTORY_COMMAND_NUM > 0
         }
     }
-#endif // LWCLI_HISTORY_COMMAND_NUM > 0
     else
     {
-        cmdStrBuffer[cmdStrBufferPos++] = revChar;
-        findHistoryEnable = false;
-        lwcli_output_char(revChar);
+        if (cursorPosNow == cmdStrBufferPos)  // 普通字符且光标处于最后
+        {
+            cmdStrBuffer[cmdStrBufferPos++] = revChar;
+            cursorPosNow = cmdStrBufferPos;
+            findHistoryEnable = false;
+            lwcli_output_char(revChar);
+        }
+        else    // 普通字符但光标不是在最后
+        {
+            lwcli_output_char(revChar);
+            for (size_t i = cursorPosNow; i < cmdStrBufferPos; i++) // 输出原本光标后面的字符
+            {
+                lwcli_output_char(cmdStrBuffer[i]);
+            }
+            
+            for (size_t i = 0; i < cmdStrBufferPos - cursorPosNow; i++) // 将光标移动到正确的位置
+            {
+                lwcli_output_string(LWCLI_SHELL_CURSOR_LEFT_STRING, strlen(LWCLI_SHELL_CURSOR_LEFT_STRING));
+            }
+
+            for (size_t i = cmdStrBufferPos; i > cursorPosNow; i--) // 字符串缓存处理，保证cmdStrBuffer中存储的字符串和屏幕一致
+            {
+                cmdStrBuffer[i] = cmdStrBuffer[i - 1];
+            }
+            cmdStrBuffer[cursorPosNow] = revChar;
+            cmdStrBufferPos++;
+            cursorPosNow++;
+        }
     }
 }
 
@@ -442,7 +570,7 @@ static void lwcli_delete_output(uint16_t nowCmooandLength)
     {
         for (int i = 0; i < historyList->deleteLength; i++)
         {
-            lwcli_output_char(LWCLI_DELETE_CHAR);
+            lwcli_output_char(LWCLI_SHELL_DELETE_CHAR);
         }
     }
     historyList->deleteLength = nowCmooandLength;

@@ -44,17 +44,46 @@
  */
 #define LWCLI_HISTORY_COMMAND_NUM 10
 
-/**
- * @brief 删除字符
- */
-#define LWCLI_DELETE_CHAR 0x7F
-
 
 /**
- * @brief 退格字符
+ * @defgroup ANSI 控制序列
+ * { 
  */
-#define LWCLI_BACK_CHAR '\177'
+/**
+ * @brief 终端删除字符
+ */
+#define LWCLI_SHELL_DELETE_CHAR 0x7F
 
+
+/**
+ * @brief 终端退格字符
+ */
+#define LWCLI_SHELL_BACK_CHAR '\177'
+
+/**
+ * @brief 控制终端光标右移
+ */
+#define LWCLI_SHELL_CURSOR_RIGHT_STRING "\033[C"
+
+/**
+ * @brief 控制终端光标左移
+ */
+#define LWCLI_SHELL_CURSOR_LEFT_STRING "\033[D"
+
+/**
+ * @brief 控制终端清屏字符
+ */
+#define LWCLI_SHELL_CLEAR_STRING "\x1B[2J"
+
+
+/**
+ * @brief 终端光标移动到0,0位置
+ */
+#define LWCLI_SHELL_CURSOR_TO_ZERO_STRING "\x1B[0;0H"
+/**
+ * @defgroup
+ * } 
+ */
 
 /**
  * @brief 命令未找到错误信息
