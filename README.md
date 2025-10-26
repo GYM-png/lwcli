@@ -21,6 +21,7 @@
 - **参数解析**：自动解析命令参数，最大支持 `LWCLI_COMMAND_STR_MAX_LENGTH` 字节的命令长度。
 - **历史记录**：支持最多 `LWCLI_HISTORY_COMMAND_NUM` 条命令历史记录，占用约 `LWCLI_HISTORY_COMMAND_NUM * LWCLI_RECEIVE_BUFFER_SIZE` 字节内存。
 - **光标编辑**: 支持左右方向键移动光标，实现命令行编辑（插入、删除字符）。
+- **文件系统支持**: 当启用 LWCLI_WITH_FILE_SYSTEM 时，提示符可显示用户名和当前路径（如 Linux shell），路径由用户在 lwcli_port.c 中实现。
 - **跨平台**：通过硬件抽象层 (`lwcli_port.c`) 支持不同硬件平台的串口/USB 接口。
 - **FreeRTOS 集成**：提供任务创建和处理功能，易于嵌入式多任务环境。
 - **错误提示**：内置帮助命令和未识别命令提示。
@@ -113,18 +114,25 @@ int main(void) {
 
 | 参数名                        | 默认值 | 描述                              |
 |-------------------------------|--------|-----------------------------------|
-| `LWCLI_COMMAND_STR_MAX_LENGTH` | 10           | 命令字符串最大长度（不含参数）    |
-| `LWCLI_HELP_STR_MAX_LENGTH`        | 100      | 帮助字符串最大长度                |
-| `LWCLI_RECEIVE_BUFFER_SIZE`        | 50       | 接收缓冲区大小                    |
-| `LWCLI_HISTORY_COMMAND_NUM`        | 10       | 历史命令最大数量（0 禁用历史记录）|
-| `LWCLI_SHELL_DELETE_CHAR`          | 0x7F     | 删除字符                          |
-| `LWCLI_SHELL_BACK_CHAR`            | '\177'   | 退格字符                          |
-| `LWCLI_SHELL_CURSOR_RIGHT_STRING`  | "\033[C"   | 光标右移 ANSI 序列            |
-| `LWCLI_SHELL_CURSOR_LEFT_STRING`   | "\033[D"   | 光标左移 ANSI 序列           |
-| `LWCLI_SHELL_CLEAR_STRING`            | "\x1B[2J"   | 清屏 ANSI 序列      |
+| `LWCLI_COMMAND_STR_MAX_LENGTH` | 10                   | 命令字符串最大长度（不含参数）    |
+| `LWCLI_HELP_STR_MAX_LENGTH`        | 100              | 帮助字符串最大长度                |
+| `LWCLI_RECEIVE_BUFFER_SIZE`        | 50               | 接收缓冲区大小                    |
+| `LWCLI_HISTORY_COMMAND_NUM`        | 10               | 历史命令最大数量（0 禁用历史记录）|
+| `LWCLI_SHELL_DELETE_CHAR`          | 0x7F             | 删除字符                          |
+| `LWCLI_SHELL_BACK_CHAR`            | '\177'           | 退格字符                          |
+| `LWCLI_SHELL_CURSOR_RIGHT_STRING`  | "\033[C"         | 光标右移 ANSI 序列            |
+| `LWCLI_SHELL_CURSOR_LEFT_STRING`   | "\033[D"         | 光标左移 ANSI 序列           |
+| `LWCLI_SHELL_CLEAR_STRING`            | "\x1B[2J"     | 清屏 ANSI 序列      |
 | `LWCLI_SHELL_CURSOR_TO_ZERO_STRING`   | "\x1B[0;0H"   | 光标移至 (0,0) 位置      |
+| `LWCLI_WITH_FILE_SYSTEM`          | true              | 是否启用文件系统提示符     |
+| `LWCLI_USER_NAME`                 | "lwcli@STM32"     | 用户名（仅在文件系统启用时有效）|
 | `LWCLI_COMMAND_FIND_FAIL_MESSAGE` | "Command not recognised. Enter 'help' to view a list of available commands.\r\n" | 命令未找到提示 |
 
+> **文件系统支持**：  
+> - 启用 `LWCLI_WITH_FILE_SYSTEM = true` 后，提示符将显示为：  
+>   `LWCLI_USER_NAME` + `:` + `当前路径` + `$ `  
+> - 当前路径由用户在 `lwcli_port.c` 中实现 `lwcli_get_file_path()` 函数返回。  
+> - 若未实现该函数或返回 `NULL`，将显示默认路径 `/`。
 修改这些参数以适配您的需求，但需注意内存占用。
 
 ## 项目结构

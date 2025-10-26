@@ -122,7 +122,15 @@ The `lwcli_config.h` file defines the following configuration parameters:
 | `LWCLI_SHELL_CURSOR_LEFT_STRING`  | "\033[D"      | ANSI sequence for cursor left             |
 | `LWCLI_SHELL_CLEAR_STRING`        | "\x1B[2J"     | ANSI sequence for screen clear            |
 | `LWCLI_SHELL_CURSOR_TO_ZERO_STRING`| "\x1B[0;0H"  | ANSI sequence to move cursor to (0,0)     |
+| `LWCLI_WITH_FILE_SYSTEM`              | true                  | Enable file system prompt                |
+| `LWCLI_USER_NAME`                     | "lwcli@STM32"         | Username (only valid when file system is enabled) |
 | `LWCLI_COMMAND_FIND_FAIL_MESSAGE` | "Command not recognised. Enter 'help' to view a list of available commands.\r\n" | Unrecognized command message |
+
+> **File System Support**:  
+> - When `LWCLI_WITH_FILE_SYSTEM = true`, the prompt will display:  
+>   `LWCLI_USER_NAME` + `:` + `current path` + `$ `  
+> - The current path is returned by the user-implemented `lwcli_get_file_path()` function in `lwcli_port.c`.  
+> - If the function is not implemented or returns `NULL`, the default path `/` will be shown.
 
 Modify these parameters to suit your needs, keeping memory constraints in mind.
 

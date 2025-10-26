@@ -21,7 +21,11 @@
 extern uint16_t lwcli_receive(char *buffer, uint16_t buffer_size, uint32_t time_out);
 extern void *lwcli_malloc(size_t size);
 extern void lwcli_output_char(char output_char);
+extern void lwcli_output_string(char *output_string, uint16_t string_len);
 extern void lwcli_hardware_init(void);
+
+/*lwcli.c 函数*/
+extern void lwcli_output_file_path(void);
 
 void lwcli_task(void *pvparameters)
 {
@@ -33,16 +37,13 @@ void lwcli_task(void *pvparameters)
     if (receive_buffer == NULL)
     {
         char *error_message = "lwcli malloc error before start\r\n";
-        for (size_t i = 0; i < strlen(error_message); i++)
-        {
-            lwcli_output_char(error_message[i]);
-        }
+        lwcli_output_string(error_message, strlen(error_message));
         while (1);
     }
-    for (size_t i = 0; i < strlen(wellcome_message); i++)
-    {
-        lwcli_output_char(wellcome_message[i]);
-    }
+    lwcli_output_string(wellcome_message, strlen(wellcome_message));
+#if (LWCLI_WITH_FILE_SYSTEM == true)
+    lwcli_output_file_path();
+#endif
     while(1)
     {
         receive_length = lwcli_receive(receive_buffer, LWCLI_RECEIVE_BUFFER_SIZE, portMAX_DELAY);

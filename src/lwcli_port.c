@@ -11,12 +11,13 @@
 /* library includes. */
 #include "stdlib.h"
 #include "stdio.h"
+#include "lwcli_config.h"
 
 /* Your includes. */
 #include "malloc.h"
 #include "mydebug.h"
 #include "usart_drv.h"
-
+#include "file_cmd.h"
 
 /**
  * @brief 内存申请函数
@@ -82,3 +83,15 @@ uint16_t lwcli_receive(char *buffer, uint16_t buffer_size, uint32_t time_out)
     /* add your receive function here */
     return uart_receive(DEBUG_UART_INDEX, buffer, buffer_size, time_out);
 }
+
+#if (LWCLI_WITH_FILE_SYSTEM == true)
+/**
+ * @brief 获取当前文件系统路径
+ * @return 当前文件路径
+ */
+char *lwcli_get_file_path(void)
+{
+    /* add your get file path function here */
+    return file_get_now_path();
+}
+#endif

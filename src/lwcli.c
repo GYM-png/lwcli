@@ -49,6 +49,37 @@ static void lwcli_history_command_down(char *cmdStr);
 static void lwcli_history_command_up(char *cmdStr);
 #endif  // LWCLI_HISTORY_COMMAND_NUM > 0
 
+#if (LWCLI_WITH_FILE_SYSTEM == true)
+typedef enum
+{
+    COLOR_RED = 0,
+    COLOR_GREEN,
+    COLOR_YELLOW,
+    COLOR_BLUE,
+    COLOR_PURPLE,
+    COLOR_CYAN,
+    COLOR_WHITE,
+    COLOR_NONE,
+}colorEnum_e;
+
+static char *colorTable[] = {
+    "\x1B[31m",
+    "\x1B[32m",
+    "\x1B[33m",
+    "\x1B[34m",
+    "\x1B[35m",
+    "\x1B[36m",
+    "\x1B[37m",
+    "\x1B[30m",
+};
+#define LWCLI_ANSI_COLOR_RESET "\x1B[0m"
+
+static void lwcli_output_string_withcolor(char *str, colorEnum_e color);
+void lwcli_output_file_path(void);
+#endif  // LWCLI_WITH_FILE_SYSTEM == true
+
+
+
 /* 链表结构体定义  */
 static cmdList_t *cmdListHead = NULL;   // 命令链表头
 static bool findHistoryEnable = false;
@@ -65,6 +96,9 @@ extern void *lwcli_malloc(size_t size);
 extern void lwcli_free(void *ptr);
 extern void lwcli_output_char(char output_char);
 extern void lwcli_output_string(char *output_string, uint16_t string_len);
+#if (LWCLI_WITH_FILE_SYSTEM == true)
+extern char *lwcli_get_file_path(void);
+#endif  // LWCLI_WITH_FILE_SYSTEM == true
 
 
 
@@ -205,11 +239,11 @@ void lwcli_process_receive_char(char revChar)
 {
 #if (LWCLI_HISTORY_COMMAND_NUM > 0)
     static char findHistoryKey[3] = {0, 0, 0};
-    static char cursorMoveKey[3] = {0, 0, 0};
     static uint8_t findHistoryKeyPos = 0;
+#endif
+    static char cursorMoveKey[3] = {0, 0, 0};
     static uint8_t cursorMoveKeyPos = 0;
     static uint16_t cursorPosNow = 0;
-#endif
     if (revChar == '\r' || revChar == '\n')
     {
         cmdStrBuffer[cmdStrBufferPos] = '\0';
@@ -262,7 +296,9 @@ void lwcli_process_receive_char(char revChar)
     {
         if (revChar == 0x1B || revChar == 0x5B)
         {
+            #if (LWCLI_HISTORY_COMMAND_NUM > 0)
             findHistoryKey[findHistoryKeyPos++] = revChar;
+            #endif
             cursorMoveKey[cursorMoveKeyPos++] = revChar;
         }
         else
@@ -272,7 +308,9 @@ void lwcli_process_receive_char(char revChar)
                 cursorMoveKey[cursorMoveKeyPos++] = revChar;
                 if (cursorMoveKeyPos == 3)
                 {
+                    #if (LWCLI_HISTORY_COMMAND_NUM > 0)
                     findHistoryKeyPos = 0;
+                    #endif
                     if (cursorMoveKey[0] == 0x1B && cursorMoveKey[1] == 0x5B && cursorMoveKey[2] == 0x44)
                     {
                         if (cursorPosNow > 0)
@@ -375,6 +413,9 @@ static void lwcli_process_command(char *cmdStr)
             if (parameter_num == 0)
             {
                 node->cmdFunc(NULL ,0);
+                #if (LWCLI_WITH_FILE_SYSTEM == true)
+                lwcli_output_file_path();
+                #endif  
                 return;
             }
             else
@@ -387,12 +428,19 @@ static void lwcli_process_command(char *cmdStr)
                     lwcli_free(parameterArray[i]);
                 }
                 lwcli_free(parameterArray);
+                #if (LWCLI_WITH_FILE_SYSTEM == true)
+                lwcli_output_file_path();
+                #endif   
                 return;
-            }
+            }         
         }
         node = node->next;
     }
+#if (LWCLI_WITH_FILE_SYSTEM == false)
     lwcli_output_string(LWCLI_COMMAND_FIND_FAIL_MESSAGE, strlen(LWCLI_COMMAND_FIND_FAIL_MESSAGE));
+#else
+    lwcli_output_file_path();
+#endif
 }
 
 /**
@@ -679,3 +727,29 @@ static void lwcli_history_command_down(char *cmdStr)
 }
 
 #endif // LWCLI_HISTORY_COMMAND_NUM > 0
+
+#if (LWCLI_WITH_FILE_SYSTEM == true)
+
+/**
+ * @brief 通过ANSI编码输出带颜色的字符串
+ * @param str 字符串
+ * @param color 颜色
+ */
+static void lwcli_output_string_withcolor(char *str, colorEnum_e color)
+{
+    lwcli_output_string(colorTable[color], strlen(colorTable[color]));
+    lwcli_output_string(str, strlen(str));
+    lwcli_output_string(LWCLI_ANSI_COLOR_RESET, strlen(LWCLI_ANSI_COLOR_RESET));
+}
+
+/**
+ * @brief 输出当前路径
+ */
+void lwcli_output_file_path(void)
+{
+    char *filePath = lwcli_get_file_path();
+    lwcli_output_string_withcolor(LWCLI_USER_NAME ":", COLOR_GREEN);
+    lwcli_output_string_withcolor(filePath, COLOR_BLUE);
+    lwcli_output_string("$ ", 2);
+}
+#endif // LWCLI_WITH_FILE_SYSTEM == true
