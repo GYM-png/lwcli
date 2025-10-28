@@ -25,7 +25,7 @@
  * @param cmdParameterArry 参数数组
  * @param parameterNum 参数数量
  */
-typedef void (*cliCmdFunc)(char **command_arry, uint8_t parameter_num);
+typedef void (*cliCmdFunc)(int argc, char* argv[]);
 
 void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc);
 void lwcli_task_start(const uint16_t StackDepth, const uint8_t uxPriority);

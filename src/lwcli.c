@@ -18,7 +18,7 @@ typedef struct cmdList
 {
     char cmdStr[LWCLI_COMMAND_STR_MAX_LENGTH];
     char helpStr[LWCLI_HELP_STR_MAX_LENGTH];
-    void (*cmdFunc)(char **command_arry, uint8_t parameter_num);
+    cliCmdFunc callBack;
     struct cmdList *next;
 }cmdList_t;
 
@@ -137,7 +137,7 @@ void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback)
         }
         memcpy(cmdListHead->cmdStr, "help", strlen("help"));
         cmdListHead->cmdStr[4] = '\0';
-        cmdListHead->cmdFunc = lwcli_help;
+        cmdListHead->callBack = lwcli_help;
         cmdListHead->next = NULL;
 
         /** 注册清屏命令 */
@@ -151,7 +151,7 @@ void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback)
         memcpy(clearNode->helpStr, "clear screen", strlen("clear screen"));
         clearNode->cmdStr[5] = '\0';
         clearNode->helpStr[12] = '\0';
-        clearNode->cmdFunc = lwcli_clear;
+        clearNode->callBack = lwcli_clear;
         clearNode->next = NULL;
         cmdListHead->next = clearNode;
 
@@ -186,7 +186,7 @@ void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback)
     newNode->cmdStr[strlen(cmdStr)] = '\0';
     memcpy(newNode->helpStr, helpStr, strlen(helpStr));
     newNode->helpStr[strlen(helpStr)] = '\0';
-    newNode->cmdFunc = userCallback;
+    newNode->callBack = userCallback;
     newNode->next = NULL;
     while (pnode->next)
     {
@@ -257,8 +257,12 @@ void lwcli_process_receive_char(char revChar)
         lwcli_history_list_update();
         #endif
     }
-    else if ((revChar == '\b' || revChar == LWCLI_SHELL_BACK_CHAR) && cmdStrBufferPos > 0)
+    else if ((revChar == '\b' || revChar == LWCLI_SHELL_BACK_CHAR))
     {
+        if (cmdStrBufferPos == 0)
+        {
+            return;
+        }
         if (cursorPosNow == cmdStrBufferPos)
         {
             cmdStrBuffer[--cmdStrBufferPos] = '\0';
@@ -412,7 +416,7 @@ static void lwcli_process_command(char *cmdStr)
             uint8_t parameter_num = lwcli_get_parameter_number(cmdParameter);
             if (parameter_num == 0)
             {
-                node->cmdFunc(NULL ,0);
+                node->callBack(0, NULL);
                 #if (LWCLI_WITH_FILE_SYSTEM == true)
                 lwcli_output_file_path();
                 #endif  
@@ -422,7 +426,7 @@ static void lwcli_process_command(char *cmdStr)
             {
                 char **parameterArray = (char **) lwcli_malloc(sizeof(char *) * parameter_num);
                 uint8_t findParameterNum = lwcli_find_parameters(cmdParameter + strlen(node->cmdStr), parameterArray);
-                node->cmdFunc(parameterArray ,findParameterNum);
+                node->callBack(findParameterNum, parameterArray);
                 for (int i = 0; i < findParameterNum; ++i)
                 {
                     lwcli_free(parameterArray[i]);

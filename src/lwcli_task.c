@@ -15,7 +15,7 @@
 #include "task.h"
 #include "lwcli_config.h"
 #include "string.h"
-
+#include "stdbool.h"
 
 /* lwcli_port 接口 */
 extern uint16_t lwcli_receive(char *buffer, uint16_t buffer_size, uint32_t time_out);
@@ -25,7 +25,9 @@ extern void lwcli_output_string(char *output_string, uint16_t string_len);
 extern void lwcli_hardware_init(void);
 
 /*lwcli.c 函数*/
+#if (LWCLI_WITH_FILE_SYSTEM == true)
 extern void lwcli_output_file_path(void);
+#endif
 
 void lwcli_task(void *pvparameters)
 {

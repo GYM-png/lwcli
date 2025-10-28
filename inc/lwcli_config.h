@@ -95,7 +95,7 @@
  * @note true 表示支持文件系统，false 表示不支持文件系统
  * @note 开启后会输出一个用户名和当前路径的提示信息，文件路径获取由用户实现 @ref lwcli_get_file_path in lwcli_port.c
  */
-#define LWCLI_WITH_FILE_SYSTEM true
+#define LWCLI_WITH_FILE_SYSTEM false
 
 #if (LWCLI_WITH_FILE_SYSTEM == true)
 /**
