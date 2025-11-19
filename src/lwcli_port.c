@@ -57,7 +57,7 @@ void lwcli_hardware_init(void)
 void lwcli_output_char(char output_char)
 {
     /* add your output function here */
-    debug_log_print("%c", output_char);
+    uart_transmit(DEBUG_UART_INDEX, &output_char, 1);
 }
 
 /**
@@ -68,7 +68,7 @@ void lwcli_output_char(char output_char)
 void lwcli_output_string(char *output_string, uint16_t string_len)
 {
     /* add your output function here */
-    debug_log_print("%s", output_string);
+    uart_transmit(DEBUG_UART_INDEX, (uint8_t *)output_string, string_len);
 }
 
 /**
