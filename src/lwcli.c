@@ -2,7 +2,7 @@
  * @file lwcli.c
  * @author GYM (48060945@qq.com)
  * @brief lwcli 核心函数实现文件
- * @version 0.1
+ * @version V0.0.2
  * @date 2025-10-19
  * 
  * @copyright Copyright (c) 2025
@@ -85,8 +85,8 @@ static cmdList_t *cmdListHead = NULL;   // 命令链表头
 static bool findHistoryEnable = false;
 
 /** 静态函数声明 **/
-static void lwcli_help(char **command_arry, uint8_t parameter_num);
-static void lwcli_clear(char **command_arry, uint8_t parameter_num);
+static void lwcli_help(int argc, char* argv[]);
+static void lwcli_clear(int argc, char* argv[]);
 static uint8_t lwcli_find_parameters(const char *command_string, char **parameter_arry);
 static uint8_t lwcli_get_parameter_number(const char *command_string);
 static void lwcli_process_command(char *cmdStr);
@@ -101,32 +101,13 @@ extern char *lwcli_get_file_path(void);
 #endif  // LWCLI_WITH_FILE_SYSTEM == true
 
 
-
-
 /**
- * @brief 注册命令
- * @param cmdStr 命令字符串
- * @param helpStr 帮助字符串
- * @param userCallback 用户回调函数
+ * @brief lwcli 软件初始化
+ * @note 初始化链表和历史记录缓冲区，注册默认命令
  */
-void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback)
+void lwcli_software_init(void)
 {
-    if (strlen(cmdStr) > LWCLI_COMMAND_STR_MAX_LENGTH)
-    {
-        lwcli_output_string("command string too long please modify LWCLI_COMMAND_STR_MAX_LENGTH \r\n", strlen("command string too long please modify LWCLI_COMMAND_STR_MAX_LENGTH \r\n"));
-        return;
-    }
-    if (strlen(helpStr) > LWCLI_HELP_STR_MAX_LENGTH)
-    {
-        lwcli_output_string("help string too long please modify LWCLI_HELP_STR_MAX_LENGTH \r\n", strlen("help string too long please modify LWCLI_HELP_STR_MAX_LENGTH \r\n"));
-        return;
-    }
-    if (cmdStr == NULL || helpStr == NULL || userCallback == NULL)
-    {
-        lwcli_output_string("command string or help string or callback function is null\r\n", strlen("command string or help string or callback function is null\r\n"));
-        return;
-    }
-    if (cmdListHead == NULL)    // 第一次调用时 做初始化
+    if (cmdListHead == NULL)    // 仅第一次调用时 初始化
     {
         /** 初始化头节点并绑定帮助命令 */
         cmdListHead = (cmdList_t *)lwcli_malloc(sizeof(cmdList_t));
@@ -175,6 +156,32 @@ void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback)
         memset(historyList->buffer, 0, LWCLI_HISTORY_COMMAND_NUM * LWCLI_RECEIVE_BUFFER_SIZE);
         #endif // LWCLI_HISTORY_COMMAND_NUM > 0
     }
+}
+
+/**
+ * @brief 注册命令
+ * @param cmdStr 命令字符串
+ * @param helpStr 帮助字符串
+ * @param userCallback 用户回调函数
+ */
+void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback)
+{
+    if (strlen(cmdStr) > LWCLI_COMMAND_STR_MAX_LENGTH)
+    {
+        lwcli_output_string("command string too long please modify LWCLI_COMMAND_STR_MAX_LENGTH \r\n", strlen("command string too long please modify LWCLI_COMMAND_STR_MAX_LENGTH \r\n"));
+        return;
+    }
+    if (strlen(helpStr) > LWCLI_HELP_STR_MAX_LENGTH)
+    {
+        lwcli_output_string("help string too long please modify LWCLI_HELP_STR_MAX_LENGTH \r\n", strlen("help string too long please modify LWCLI_HELP_STR_MAX_LENGTH \r\n"));
+        return;
+    }
+    if (cmdStr == NULL || helpStr == NULL || userCallback == NULL)
+    {
+        lwcli_output_string("command string or help string or callback function is null\r\n", strlen("command string or help string or callback function is null\r\n"));
+        return;
+    }
+    lwcli_software_init(); // 保证能正确初始化
     cmdList_t *newNode = (cmdList_t *) lwcli_malloc(sizeof(cmdList_t));
     cmdList_t *pnode = cmdListHead;
     if (newNode == NULL)
@@ -199,7 +206,7 @@ void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback)
  * @brief 帮助命令
  * @param cmdParameter 命令参数
  */
-static void lwcli_help(char **command_arry, uint8_t parameter_num)
+static void lwcli_help(int argc, char* argv[])
 {
     cmdList_t *node = cmdListHead->next;
     while(node)
@@ -222,7 +229,7 @@ static void lwcli_help(char **command_arry, uint8_t parameter_num)
 /**
  * @brief 清屏命令
  */
-static void lwcli_clear(char **command_arry, uint8_t parameter_num)
+static void lwcli_clear(int argc, char* argv[])
 {
     lwcli_output_string(LWCLI_SHELL_CLEAR_STRING, strlen(LWCLI_SHELL_CLEAR_STRING));
     lwcli_output_string(LWCLI_SHELL_CURSOR_TO_ZERO_STRING, strlen(LWCLI_SHELL_CURSOR_TO_ZERO_STRING));

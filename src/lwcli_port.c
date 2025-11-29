@@ -2,7 +2,7 @@
  * @file lwcli_port.c
  * @author GYM (48060945@qq.com)
  * @brief lwcli 对外接口实现
- * @version 0.1
+ * @version V0.0.2
  * @date 2025-10-19
  * 
  * @copyright Copyright (c) 2025

@@ -2,7 +2,7 @@
  * @file lwcli.h
  * @author GYM (48060945@qq.com)
  * @brief 用户包含头文件
- * @version 0.1
+ * @version V0.0.2
  * @date 2025-10-19
  * 
  * @copyright Copyright (c) 2025
@@ -17,7 +17,7 @@
 
 #include "stdint.h"
 
-#define LWCLI_VERSION "V0.0.1"
+#define LWCLI_VERSION "V0.0.2"
 
 
 /**
@@ -27,8 +27,30 @@
  */
 typedef void (*cliCmdFunc)(int argc, char* argv[]);
 
-void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc);
+/**
+ * @brief 注册命令
+ * @param cmdStr 命令字符串 
+ * @param helpStr 帮助字符串 
+ * @param userCallback 用户自定义命令处理函数
+ */
+void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback);
+
+/**
+ * @brief 启动lwcli任务
+ * @param StackDepth 栈大小
+ * @param uxPriority 优先级
+ */
 void lwcli_task_start(const uint16_t StackDepth, const uint8_t uxPriority);
+
+
+#if (LWCLI_ENABLE_REMOTE_COMMAND == true)
+/**
+ * @brief 写入远程命令
+ * @param command 命令字符串
+ * @param command_len 命令长度
+ */
+void lwcli_write_remote_command(char *command, uint16_t command_len);
+#endif  // LWCLI_ENABLE_REMOTE_COMMAND
 
 #ifdef __cplusplus
     }
