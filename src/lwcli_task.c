@@ -32,7 +32,6 @@ extern void lwcli_output_file_path(void);
 #endif
 
 #if (LWCLI_ENABLE_REMOTE_COMMAND == true)
-
 /**
  * @brief 存储远程命令
  */
@@ -54,8 +53,8 @@ void lwcli_write_remote_command(char *command, uint16_t command_len)
     {
         return;
     }
-    memcpy(remote_cmd_info.cmd, command, command_len);
-    remote_cmd_info.cmd_len = command_len;
+    memcpy(remote_cmd_info.command, command, command_len);
+    remote_cmd_info.command_len = command_len;
 }
 
 /**
@@ -87,7 +86,9 @@ void lwcli_task(void *pvparameters)
     lwcli_software_init();
     lwcli_hardware_init();
     receive_buffer = (char *)lwcli_malloc(LWCLI_RECEIVE_BUFFER_SIZE);
-    remote_cmd_info.cmd = (char *)lwcli_malloc(LWCLI_RECEIVE_BUFFER_SIZE);
+    #if (LWCLI_ENABLE_REMOTE_COMMAND == true)
+    remote_cmd_info.command = (char *)lwcli_malloc(LWCLI_RECEIVE_BUFFER_SIZE);
+    #endif
     char *wellcome_message = "lwcli start, nType Help to view a list of registered commands\r\n";
     if (receive_buffer == NULL)
     {
