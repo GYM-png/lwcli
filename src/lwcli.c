@@ -258,6 +258,8 @@ void lwcli_process_receive_char(char revChar)
         lwcli_process_command(cmdStrBuffer);
         memset(cmdStrBuffer, 0, LWCLI_RECEIVE_BUFFER_SIZE);
         cmdStrBufferPos = 0;
+        cursorMoveKeyPos = 0;
+        cursorPosNow = 0;
         cursorPosNow = cmdStrBufferPos;
         findHistoryEnable = true;
         #if (LWCLI_HISTORY_COMMAND_NUM > 0)
@@ -309,8 +311,14 @@ void lwcli_process_receive_char(char revChar)
         {
             #if (LWCLI_HISTORY_COMMAND_NUM > 0)
             findHistoryKey[findHistoryKeyPos++] = revChar;
+            if (findHistoryKeyPos == 3){
+                findHistoryKeyPos = 0;
+            }
             #endif
             cursorMoveKey[cursorMoveKeyPos++] = revChar;
+            if (cursorMoveKeyPos == 3){
+                cursorMoveKeyPos = 0;
+            }
         }
         else
         {
@@ -518,10 +526,7 @@ static uint8_t lwcli_find_parameters(const char *command_string, char **paramete
     {
         uint8_t start = index[i];
         uint8_t end = 0;
-        if (i % 2 == 0)
-            end = (i + 1 < found_num) ? index[i + 1] - 1: len;  // 确保最后一个参数处理正确
-        else
-            end = (i + 1 < found_num) ? index[i + 1] - 2: len;  // 确保最后一个参数处理正确
+        end = (i + 1 < found_num) ? index[i + 1] - 1: len;  // 确保最后一个参数处理正确
         uint8_t param_len = end - start;
 
         parameter_arry[i] = (char *)lwcli_malloc(param_len + 1);  // 分配内存

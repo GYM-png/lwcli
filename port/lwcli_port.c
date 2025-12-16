@@ -14,10 +14,7 @@
 #include "lwcli_config.h"
 
 /* Your includes. */
-#include "malloc.h"
-#include "mydebug.h"
-#include "usart_drv.h"
-#include "file_cmd.h"
+
 
 /**
  * @brief 内存申请函数
@@ -27,7 +24,7 @@
 void *lwcli_malloc(size_t size)
 {
     /* add your malloc funcion here */
-    return mymalloc(MEM_SRM3, size );
+    return NULL;
 }
 
 /**
@@ -37,7 +34,7 @@ void *lwcli_malloc(size_t size)
 void lwcli_free(void *ptr)
 {
     /* add your free funcion here */
-    myfree(ptr);
+    
 }
 
 /**
@@ -57,7 +54,6 @@ void lwcli_hardware_init(void)
 void lwcli_output_char(char output_char)
 {
     /* add your output function here */
-    uart_transmit(DEBUG_UART_INDEX, &output_char, 1);
 }
 
 /**
@@ -68,7 +64,6 @@ void lwcli_output_char(char output_char)
 void lwcli_output_string(char *output_string, uint16_t string_len)
 {
     /* add your output function here */
-    uart_transmit(DEBUG_UART_INDEX, (uint8_t *)output_string, string_len);
 }
 
 /**
@@ -81,7 +76,7 @@ void lwcli_output_string(char *output_string, uint16_t string_len)
 uint16_t lwcli_receive(char *buffer, uint16_t buffer_size, uint32_t time_out)
 {
     /* add your receive function here */
-    return uart_receive(DEBUG_UART_INDEX, buffer, buffer_size, time_out);
+    return 0;
 }
 
 #if (LWCLI_WITH_FILE_SYSTEM == true)
@@ -92,6 +87,6 @@ uint16_t lwcli_receive(char *buffer, uint16_t buffer_size, uint32_t time_out)
 char *lwcli_get_file_path(void)
 {
     /* add your get file path function here */
-    return file_get_now_path();
+    return  "/";
 }
 #endif

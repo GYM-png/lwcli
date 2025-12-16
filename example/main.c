@@ -4,14 +4,14 @@
 /**
  * @brief 测试命令回调函数
  * @note 当输入"test 123 456 -789"时，会打印"123 456 -789"
- * @param args 参数数组 
- * @param arge_num 参数数量
+ * @param argc 参数数量
+ * @param argv 参数数组 
  */
-void test_command_callback(char **args, uint8_t arge_num)
+void test_command_callback(int argc, char* argv[])
 {
-    for (int i = 0; i < arge_num; i++)
+    for (int i = 0; i < argc; i++)
     {
-        printf("%s ", args[i]);// 打印所有参数
+        printf("%s ", argv[i]);// 打印所有参数
     }
     printf("\r\n");
 }
