@@ -18,6 +18,7 @@ typedef struct cmdList
 {
     char cmdStr[LWCLI_COMMAND_STR_MAX_LENGTH];
     char helpStr[LWCLI_HELP_STR_MAX_LENGTH];
+    uint8_t cmdLen;
     cliCmdFunc callBack;
     struct cmdList *next;
 }cmdList_t;
@@ -87,7 +88,7 @@ static bool findHistoryEnable = false;
 /** 静态函数声明 **/
 static void lwcli_help(int argc, char* argv[]);
 static void lwcli_clear(int argc, char* argv[]);
-static uint8_t lwcli_find_parameters(const char *command_string, char **parameter_arry);
+static uint8_t lwcli_find_parameters(const char *argv_str, char **parameter_arry, uint8_t parameter_num);
 static uint8_t lwcli_get_parameter_number(const char *command_string);
 static void lwcli_process_command(char *cmdStr);
 
@@ -116,7 +117,8 @@ void lwcli_software_init(void)
             lwcli_output_string("lwcli malloc error\r\n", strlen("lwcli malloc error\r\n"));
             return;
         }
-        memcpy(cmdListHead->cmdStr, "help", strlen("help"));
+        cmdListHead->cmdLen = strlen("help");
+        memcpy(cmdListHead->cmdStr, "help", cmdListHead->cmdLen);
         cmdListHead->cmdStr[4] = '\0';
         cmdListHead->callBack = lwcli_help;
         cmdListHead->next = NULL;
@@ -128,7 +130,8 @@ void lwcli_software_init(void)
             lwcli_output_string("lwcli malloc error\r\n", strlen("lwcli malloc error\r\n"));
             return;
         }
-        memcpy(clearNode->cmdStr, "clear", strlen("clear"));
+        clearNode->cmdLen = strlen("clear");
+        memcpy(clearNode->cmdStr, "clear", clearNode->cmdLen);
         memcpy(clearNode->helpStr, "clear screen", strlen("clear screen"));
         clearNode->cmdStr[5] = '\0';
         clearNode->helpStr[12] = '\0';
@@ -189,8 +192,9 @@ void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback)
         lwcli_output_string("lwcli malloc error\r\n", strlen("lwcli malloc error\r\n"));
         return;
     }
-    memcpy(newNode->cmdStr, cmdStr, strlen(cmdStr));
-    newNode->cmdStr[strlen(cmdStr)] = '\0';
+    newNode->cmdLen = strlen(cmdStr);
+    memcpy(newNode->cmdStr, cmdStr, newNode->cmdLen);
+    newNode->cmdStr[newNode->cmdLen] = '\0';
     memcpy(newNode->helpStr, helpStr, strlen(helpStr));
     newNode->helpStr[strlen(helpStr)] = '\0';
     newNode->callBack = userCallback;
@@ -213,9 +217,9 @@ static void lwcli_help(int argc, char* argv[])
     {
         if (node->helpStr[0] != '\0')
         {
-            lwcli_output_string(node->cmdStr, strlen(node->cmdStr));
+            lwcli_output_string(node->cmdStr, node->cmdLen);
             lwcli_output_char(':');
-            for (uint16_t i = 0; i < (LWCLI_COMMAND_STR_MAX_LENGTH - (strlen(node->cmdStr) + 1) + 4); i++)  // 打印空格对齐
+            for (uint16_t i = 0; i < (LWCLI_COMMAND_STR_MAX_LENGTH - (node->cmdLen + 1) + 4); i++)  // 打印空格对齐
             {
                 lwcli_output_char(' ');
             }
@@ -421,8 +425,9 @@ static void lwcli_process_command(char *cmdStr)
     char *cmdParameter = NULL;
     while (node)
     {
-        if ((cmdParameter = strstr(cmdStr, node->cmdStr)) != NULL)
+        if (strncmp(cmdStr, node->cmdStr, node->cmdLen) == 0)
         {
+            cmdParameter = cmdStr;
             #if (LWCLI_HISTORY_COMMAND_NUM > 0)
             /** 添加命令历史记录 */
             lwcli_add_history_command(cmdStr);
@@ -440,7 +445,12 @@ static void lwcli_process_command(char *cmdStr)
             else
             {
                 char **parameterArray = (char **) lwcli_malloc(sizeof(char *) * parameter_num);
-                uint8_t findParameterNum = lwcli_find_parameters(cmdParameter + strlen(node->cmdStr), parameterArray);
+                if (parameterArray == NULL)
+                {
+                    lwcli_output_string("error malloc\r\n", strlen("error malloc\r\n"));
+                    return;
+                }
+                uint8_t findParameterNum = lwcli_find_parameters(cmdParameter + node->cmdLen, parameterArray, parameter_num);
                 node->callBack(findParameterNum, parameterArray);
                 for (int i = 0; i < findParameterNum; ++i)
                 {
@@ -464,60 +474,66 @@ static void lwcli_process_command(char *cmdStr)
 
 /**
  * @brief 寻找参数总数量
+ * @note 支持识别双引号
  * @param command_string 命令字符串
  * @return 参数数量
  */
 static uint8_t lwcli_get_parameter_number(const char *command_string)
 {
     uint8_t len = strlen(command_string);
-    uint8_t parameter_num = 0;
+    bool in_quotes = false; // 是否处于引号中
+    uint8_t parameter_num = 0, quotes_num = 0;
     for (uint8_t i = 0; i < len - 1; i++)
     {
-        if (command_string[i] == ' ' && command_string[i + 1] != ' ')
+        if (command_string[i] == ' ' && command_string[i + 1] != ' ' && !in_quotes)
         {
             parameter_num++;
         }
+        else if (command_string[i] == '\"') // 引号
+        {
+            quotes_num++;
+            in_quotes = !in_quotes;
+        }
     }
+    if (command_string[len - 1] == '\"')
+    {
+        quotes_num++;
+    }
+    parameter_num = (quotes_num % 2 == 0) ? parameter_num : 0; // 奇数个引号则参数无效
     return parameter_num;
 }
 
 /**
  * @brief 提取参数放入字符串数组
- * @param command_string 整个参数字符串
+ * @param argv_str 整个参数字符串
  * @param parameter_arry 字符串数组，存放提取出的参数
  * @return 找到的参数个数
  */
-static uint8_t lwcli_find_parameters(const char *command_string, char **parameter_arry)
+static uint8_t lwcli_find_parameters(const char *argv_str, char **parameter_arry, uint8_t parameter_num)
 {
-    uint8_t len = strlen(command_string);
+    uint8_t len = strlen(argv_str);
     uint8_t found_num = 0;
-    uint8_t parameter_num = 0;//总参数数量
-    for (uint8_t i = 0; i < len - 1; i++)//寻找参数总数量
-    {
-        if (command_string[i] == ' ' && command_string[i + 1] != ' ')
-        {
-            parameter_num++;
-        }
-    }
-    if (parameter_num == 0)
-    {
-        return 0;
-    }
+    bool in_quotes = false; // 是否处于引号中
 
     uint8_t *index = (uint8_t*) lwcli_malloc(sizeof(uint8_t) * (parameter_num + 1));  // 增加一个元素用于最后一个参数
     if (index == NULL)
     {
+        lwcli_output_string("error malloc\r\n", strlen("error malloc\r\n"));
         return 0;
     }
 
     // 找到参数位置
     for (uint8_t i = 0; i < len - 1; i++)
     {
-        if (command_string[i] == ' ' && command_string[i + 1] != ' ')
+        if (argv_str[i] == ' ' && argv_str[i + 1] != ' ' && !in_quotes)
         {
             index[found_num++] = i + 1;
             if (found_num == parameter_num)
                 break;
+        }
+        else if (argv_str[i] == '\"')
+        {
+            in_quotes = !in_quotes;
         }
     }
 
@@ -532,6 +548,7 @@ static uint8_t lwcli_find_parameters(const char *command_string, char **paramete
         parameter_arry[i] = (char *)lwcli_malloc(param_len + 1);  // 分配内存
         if (parameter_arry[i] == NULL)//错误处理
         {
+            lwcli_output_string("error malloc\r\n", strlen("error malloc\r\n"));
             for (uint8_t j = 0; j < i; j++)
             {
                 lwcli_free(parameter_arry[j]);
@@ -539,7 +556,7 @@ static uint8_t lwcli_find_parameters(const char *command_string, char **paramete
             lwcli_free(index);
             return 0;
         }
-        memcpy(parameter_arry[i], command_string + start, param_len);
+        memcpy(parameter_arry[i], argv_str + start, param_len);
         parameter_arry[i][param_len] = '\0';  // 添加字符串结束符 避免乱码
     }
 
