@@ -65,12 +65,6 @@
 #define LWCLI_USER_NAME "lwcli@STM32"   
 #endif // (LWCLI_WITH_FILE_SYSTEM == true)
 
-/**
- * @brief 是否支持远程命令
- * @note true 允许远程命令，false 禁止远程命令
- * @note 允许远程命令后，用户可以通过 lwcli_write_remote_command 写入远程命令
- */
-#define LWCLI_ENABLE_REMOTE_COMMAND true
 
 
 #endif

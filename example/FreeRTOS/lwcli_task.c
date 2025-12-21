@@ -11,6 +11,7 @@
  */
 
 #include "lwcli.h"
+#include "lwcli_task.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "lwcli_config.h"
@@ -79,6 +80,20 @@ static uint16_t lwcli_receive_remote_command(char *buffer)
 }
 #endif // (LWCLI_ENABLE_REMOTE_COMMAND == true)
 
+/**
+ * @brief 接收函数
+ * @param[out] buffer 缓冲区指针
+ * @param[in] buffer_size 缓冲区大小
+ * @param[in] time_out 接收超时时间
+ * @return 接收到的字节数
+ */
+uint16_t lwcli_receive(char *buffer, uint16_t buffer_size, uint32_t time_out)
+{
+    /* TODO add your receive function here */
+    return 0;
+}
+
+
 void lwcli_task(void *pvparameters)
 {
     char *receive_buffer  = NULL;
@@ -122,7 +137,11 @@ void lwcli_task(void *pvparameters)
     }
 }
 
-
+/**
+ * @brief 创建并启动lwcli任务
+ * @param StackDepth 堆栈大小
+ * @param uxPriority 优先级 
+ */
 void lwcli_task_start(const uint16_t StackDepth, const uint8_t uxPriority)
 {
     taskENTER_CRITICAL();

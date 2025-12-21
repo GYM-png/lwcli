@@ -15,6 +15,7 @@
 #include "string.h"
 #include "lwcli_config.h"
 #include "stdarg.h"
+#include "ctype.h"
 typedef struct cmdList
 {
     char cmdStr[LWCLI_COMMAND_STR_MAX_LENGTH];
@@ -120,6 +121,8 @@ static const char ansi_cursor_save[] = "\033[s";
 static const char ansi_cursor_restore[] = "\033[u";
 static const char ansi_cursor_move_to[] = "\033[%d;%dH";
 
+/** 其他字符串定义 **/
+static const char lwcli_delete[] = "\b \b";
 static const char lwcli_reminder[] = "Error: \"%s\" not registered.  Enter \"help\" to view a list of available commands.\r\n\r\n";
 
 /**
@@ -278,21 +281,20 @@ static void lwcli_printf(const char *format, ...)
  */
 void lwcli_process_receive_char(char revChar)
 {
-#if (LWCLI_HISTORY_COMMAND_NUM > 0)
-    static char findHistoryKey[3] = {0, 0, 0};
-    static uint8_t findHistoryKeyPos = 0;
-#endif
-    static char cursorMoveKey[3] = {0, 0, 0};
-    static uint8_t cursorMoveKeyPos = 0;
     static uint16_t cursorPosNow = 0;
+    static uint8_t ansiKey = 0;
     if (revChar == '\r' || revChar == '\n')
     {
         inputBuffer[inputBufferPos] = '\0';
         lwcli_output_string("\r\n", strlen("\r\n"));
         lwcli_process_command(inputBuffer);
+        #if (LWCLI_HISTORY_COMMAND_NUM > 0)
+        if (inputBufferPos > 0){
+            lwcli_add_history_command(inputBuffer);
+        }
+        #endif // LWCLI_HISTORY_COMMAND_NUM > 0
         memset(inputBuffer, 0, sizeof(inputBuffer));
         inputBufferPos = 0;
-        cursorMoveKeyPos = 0;
         cursorPosNow = 0;
         cursorPosNow = inputBufferPos;
         findHistoryEnable = true;
@@ -309,7 +311,7 @@ void lwcli_process_receive_char(char revChar)
         if (cursorPosNow == inputBufferPos)
         {
             inputBuffer[--inputBufferPos] = '\0';
-            lwcli_output_char(revChar);
+            lwcli_printf(lwcli_delete);
             findHistoryEnable = (inputBufferPos == 0) ? true : false;
             cursorPosNow = inputBufferPos;
         }
@@ -319,104 +321,76 @@ void lwcli_process_receive_char(char revChar)
             {
                 inputBuffer[i] = inputBuffer[i + 1];
             }
-            lwcli_printf("%s%c%s%s%s", ansi_clear_behind, revChar, ansi_cursor_save, &inputBuffer[cursorPosNow - 1], ansi_cursor_restore);
+            lwcli_printf("%s%s%s%s%s", ansi_clear_behind, lwcli_delete, ansi_cursor_save, &inputBuffer[cursorPosNow - 1], ansi_cursor_restore);
             inputBufferPos--;
             cursorPosNow--;
         }
     }
-    else if (revChar == 0x1B || revChar == 0x5B || revChar == 0x41 || revChar == 0x42 || revChar == 0x43 || revChar == 0x44)
+    else if (revChar == '\033')
     {
-        if (revChar == 0x1B || revChar == 0x5B)
-        {
-            #if (LWCLI_HISTORY_COMMAND_NUM > 0)
-            findHistoryKey[findHistoryKeyPos++] = revChar;
-            if (findHistoryKeyPos == 3){
-                findHistoryKeyPos = 0;
-            }
-            #endif
-            cursorMoveKey[cursorMoveKeyPos++] = revChar;
-            if (cursorMoveKeyPos == 3){
-                cursorMoveKeyPos = 0;
-            }
-        }
-        else
-        {
-            if (revChar == 0x43 || revChar == 0x44)
-            {
-                cursorMoveKey[cursorMoveKeyPos++] = revChar;
-                if (cursorMoveKeyPos == 3)
-                {
-                    #if (LWCLI_HISTORY_COMMAND_NUM > 0)
-                    findHistoryKeyPos = 0;
-                    #endif
-                    if (cursorMoveKey[0] == 0x1B && cursorMoveKey[1] == 0x5B && cursorMoveKey[2] == 0x44)
-                    {
-                        if (cursorPosNow > 0)
-                        {
-                            cursorPosNow--;
-                            lwcli_output_string(ansi_cursor_left, sizeof(ansi_cursor_left));
-                        }
-                    }
-                    else if (cursorMoveKey[0] == 0x1B && cursorMoveKey[1] == 0x5B && cursorMoveKey[2] == 0x43)
-                    {
-                        if (cursorPosNow < inputBufferPos)
-                        {
-                            cursorPosNow++;
-                            lwcli_output_string(ansi_cursor_right, sizeof(ansi_cursor_right));
-                        }
-                    }
-                    memset(cursorMoveKey, 0, 3);
-                    cursorMoveKeyPos = 0;
-                }
-            }
-#if (LWCLI_HISTORY_COMMAND_NUM > 0)
-            else
-            {
-                if (findHistoryEnable)
-                {
-                    findHistoryKey[findHistoryKeyPos++] = revChar;
-                    if (findHistoryKeyPos == 3)
-                    {
-                        cursorMoveKeyPos = 0;
-                        if (findHistoryKey[0] == 0x1B && findHistoryKey[1] == 0x5B && findHistoryKey[2] == 0x41 && findHistoryEnable)
-                        {
-                            lwcli_history_command_up(inputBuffer);
-                            lwcli_output_string(inputBuffer, strlen(inputBuffer));
-                        }
-                        else if (findHistoryKey[0] == 0x1B && findHistoryKey[1] == 0x5B && findHistoryKey[2] == 0x42 && findHistoryEnable)
-                        {
-                            lwcli_history_command_down(inputBuffer);
-                            lwcli_output_string(inputBuffer, strlen(inputBuffer));
-                        }
-                        memset(findHistoryKey, 0, 3);
-                        findHistoryKeyPos = 0;
-                        cursorPosNow = inputBufferPos;
-                    }
-                }
-            }
-#endif // LWCLI_HISTORY_COMMAND_NUM > 0
-        }
+        ansiKey = 1;
     }
     else
     {
-        if (cursorPosNow == inputBufferPos)  // 普通字符且光标处于最后
+        if (ansiKey == 0)
         {
-            inputBuffer[inputBufferPos++] = revChar;
-            cursorPosNow = inputBufferPos;
-            findHistoryEnable = false;
-            lwcli_output_char(revChar);
-        }
-        else    // 普通字符但光标不是在最后
-        {
-            lwcli_printf("%c%s%s%s", revChar, ansi_cursor_save, inputBuffer + cursorPosNow, ansi_cursor_restore);
-            
-            for (size_t i = inputBufferPos; i > cursorPosNow; i--) // 字符串缓存处理，保证cmdStrBuffer中存储的字符串和屏幕一致
+            if (cursorPosNow == inputBufferPos)  // 普通字符且光标处于最后
             {
-                inputBuffer[i] = inputBuffer[i - 1];
+                inputBuffer[inputBufferPos++] = revChar;
+                cursorPosNow = inputBufferPos;
+                findHistoryEnable = false;
+                lwcli_output_char(revChar);
             }
-            inputBuffer[cursorPosNow] = revChar;
-            inputBufferPos++;
-            cursorPosNow++;
+            else    // 普通字符但光标不是在最后
+            {
+                lwcli_printf("%c%s%s%s", revChar, ansi_cursor_save, inputBuffer + cursorPosNow, ansi_cursor_restore);
+                
+                for (size_t i = inputBufferPos; i > cursorPosNow; i--) // 字符串缓存处理，保证cmdStrBuffer中存储的字符串和屏幕一致
+                {
+                    inputBuffer[i] = inputBuffer[i - 1];
+                }
+                inputBuffer[cursorPosNow] = revChar;
+                inputBufferPos++;
+                cursorPosNow++;
+            }
+        }
+        else if (ansiKey == 1)
+        {
+            ansiKey++;
+        }
+        else if (ansiKey == 2)
+        {
+            ansiKey = 0;
+            if (revChar == 'C')
+            {
+                if (cursorPosNow < inputBufferPos)
+                {
+                    cursorPosNow++;
+                    lwcli_output_string(ansi_cursor_right, sizeof(ansi_cursor_right));
+                }
+            }
+            else if (revChar == 'D')
+            {
+                if (cursorPosNow > 0)
+                {
+                    cursorPosNow--;
+                    lwcli_output_string(ansi_cursor_left, sizeof(ansi_cursor_left));
+                }
+            }
+            #if (LWCLI_HISTORY_COMMAND_NUM > 0)
+            else if (revChar == 'A')
+            {
+                lwcli_history_command_up(inputBuffer);
+                lwcli_output_string(inputBuffer, strlen(inputBuffer));
+                cursorPosNow = inputBufferPos;
+            }
+            else if (revChar == 'B')
+            {
+                lwcli_history_command_down(inputBuffer);
+                lwcli_output_string(inputBuffer, strlen(inputBuffer));
+                cursorPosNow = inputBufferPos;
+            }
+            #endif // LWCLI_HISTORY_COMMAND_NUM > 0
         }
     }
 }
@@ -446,10 +420,6 @@ static void lwcli_process_command(char *cmdStr)
 {
     cmdList_t *node = cmdListHead;
     char *cmdParameter = NULL;
-    #if (LWCLI_HISTORY_COMMAND_NUM > 0)
-    /** 添加命令历史记录 */
-    lwcli_add_history_command(cmdStr);
-    #endif // LWCLI_HISTORY_COMMAND_NUM > 0
     while (node)
     {
         if (lwcli_match_command(cmdStr, node->cmdStr))

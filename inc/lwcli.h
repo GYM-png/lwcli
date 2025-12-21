@@ -35,12 +35,12 @@ typedef void (*cliCmdFunc)(int argc, char* argv[]);
  */
 void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback);
 
+
 /**
- * @brief 启动lwcli任务
- * @param StackDepth 栈大小
- * @param uxPriority 优先级
+ * @brief 处理接收字符
+ * @param revChar 输入的字符
  */
-void lwcli_task_start(const uint16_t StackDepth, const uint8_t uxPriority);
+void lwcli_process_receive_char(char revChar);
 
 
 #if (LWCLI_ENABLE_REMOTE_COMMAND == true)

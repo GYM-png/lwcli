@@ -1,0 +1,20 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "cmake build",
+            "command": "cd ${workspaceFolder}/example/linux/build && cmake .. && make",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "type": "shell",
+            "label": "clean build",
+            "command": "rm -rf ${workspaceFolder}/example/linux/build && mkdir ${workspaceFolder}/example/linux/build"
+        }
+    ]
+}

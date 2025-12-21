@@ -1,5 +1,5 @@
 #include "lwcli.h"
-
+#include "lwcli_task.h"
 
 /**
  * @brief 测试命令回调函数
