@@ -2,7 +2,7 @@
  * @file lwcli_config.h
  * @author GYM (48060945@qq.com)
  * @brief 用户配置参数文件
- * @version V0.0.2
+ * @version V0.0.3
  * @date 2025-10-19
  * 
  * @copyright Copyright (c) 2025
@@ -44,51 +44,12 @@
  */
 #define LWCLI_HISTORY_COMMAND_NUM 10
 
-
 /**
- * @defgroup ANSI 控制序列
- * { 
+ * @brief 终端输出缓冲区大小
  */
-/**
- * @brief 终端删除字符
- */
-#define LWCLI_SHELL_DELETE_CHAR 0x7F
+#define LWCLI_SHELL_OUTPUT_BUFFER_SIZE 128
 
 
-/**
- * @brief 终端退格字符
- */
-#define LWCLI_SHELL_BACK_CHAR '\177'
-
-/**
- * @brief 控制终端光标右移
- */
-#define LWCLI_SHELL_CURSOR_RIGHT_STRING "\033[C"
-
-/**
- * @brief 控制终端光标左移
- */
-#define LWCLI_SHELL_CURSOR_LEFT_STRING "\033[D"
-
-/**
- * @brief 控制终端清屏字符
- */
-#define LWCLI_SHELL_CLEAR_STRING "\x1B[2J"
-
-
-/**
- * @brief 终端光标移动到0,0位置
- */
-#define LWCLI_SHELL_CURSOR_TO_ZERO_STRING "\x1B[0;0H"
-/**
- * @defgroup
- * } 
- */
-
-/**
- * @brief 命令未找到错误信息
- */
-#define LWCLI_COMMAND_FIND_FAIL_MESSAGE "Command not recognised.  Enter 'help' to view a list of available commands.\r\n"
 
 /**
  * @brief 是否支持文件系统

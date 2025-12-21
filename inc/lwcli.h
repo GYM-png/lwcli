@@ -2,7 +2,7 @@
  * @file lwcli.h
  * @author GYM (48060945@qq.com)
  * @brief 用户包含头文件
- * @version V0.0.2
+ * @version V0.0.3
  * @date 2025-10-19
  * 
  * @copyright Copyright (c) 2025

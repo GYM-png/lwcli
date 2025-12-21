@@ -3,7 +3,7 @@
  * @author GYM (48060945@qq.com)
  * @brief lwcli 任务
  * @note 创建lwcli 任务，实现对接收字符串的解析
- * @version V0.0.2
+ * @version V0.0.3
  * @date 2025-10-19
  * 
  * @copyright Copyright (c) 2025
