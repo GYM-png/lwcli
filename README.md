@@ -118,15 +118,8 @@ int main(void) {
 | `LWCLI_HELP_STR_MAX_LENGTH`        | 100              | 帮助字符串最大长度                |
 | `LWCLI_RECEIVE_BUFFER_SIZE`        | 50               | 接收缓冲区大小                    |
 | `LWCLI_HISTORY_COMMAND_NUM`        | 10               | 历史命令最大数量（0 禁用历史记录）|
-| `LWCLI_SHELL_DELETE_CHAR`          | 0x7F             | 删除字符                          |
-| `LWCLI_SHELL_BACK_CHAR`            | '\177'           | 退格字符                          |
-| `LWCLI_SHELL_CURSOR_RIGHT_STRING`  | "\033[C"         | 光标右移 ANSI 序列            |
-| `LWCLI_SHELL_CURSOR_LEFT_STRING`   | "\033[D"         | 光标左移 ANSI 序列           |
-| `LWCLI_SHELL_CLEAR_STRING`            | "\x1B[2J"     | 清屏 ANSI 序列      |
-| `LWCLI_SHELL_CURSOR_TO_ZERO_STRING`   | "\x1B[0;0H"   | 光标移至 (0,0) 位置      |
 | `LWCLI_WITH_FILE_SYSTEM`          | true              | 是否启用文件系统提示符     |
 | `LWCLI_USER_NAME`                 | "lwcli@STM32"     | 用户名（仅在文件系统启用时有效）|
-| `LWCLI_COMMAND_FIND_FAIL_MESSAGE` | "Command not recognised. Enter 'help' to view a list of available commands.\r\n" | 命令未找到提示 |
 
 > **文件系统支持**：  
 > - 启用 `LWCLI_WITH_FILE_SYSTEM = true` 后，提示符将显示为：  
