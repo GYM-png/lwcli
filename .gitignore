@@ -1,0 +1,3 @@
+build/
+example/linux/build
+cppcheck_reports_*/

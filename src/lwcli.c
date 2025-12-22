@@ -45,7 +45,7 @@ typedef struct
     uint16_t findPosIndex[LWCLI_HISTORY_COMMAND_NUM];
 }historyList_t;
 static historyList_t *historyList;  // 历史记录表
-static void lwcli_add_history_command(char *cmdStr);
+static void lwcli_add_history_command(const char *cmdStr);
 static void lwcli_history_list_update(void);
 static void lwcli_history_command_down(char *cmdStr);
 static void lwcli_history_command_up(char *cmdStr);
@@ -125,6 +125,19 @@ static const char ansi_cursor_move_to[] = "\033[%d;%dH";
 static const char lwcli_delete[] = "\b \b";
 static const char lwcli_reminder[] = "Error: \"%s\" not registered.  Enter \"help\" to view a list of available commands.\r\n\r\n";
 
+/** 辅助宏 **/
+#define STR(x) #x
+#define XSTR(x) STR(x)
+#define LWCLI_COMMAND_STR_MAX_LENGTH_STR XSTR(LWCLI_COMMAND_STR_MAX_LENGTH)
+
+#define lwcli_assert(x) do{             \
+                            if(!(x)){   \
+                                lwcli_printf("%d %s", __LINE__, #x);\
+                                return; \
+                            }\
+                        }while(0)
+                        
+
 /**
  * @brief lwcli 软件初始化
  * @note 初始化链表和历史记录缓冲区，注册默认命令
@@ -189,8 +202,11 @@ void lwcli_software_init(void)
  * @param helpStr 帮助字符串
  * @param userCallback 用户回调函数
  */
-void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback)
+void lwcli_regist_command(const char *cmdStr, const char *helpStr, cliCmdFunc userCallback)
 {
+    lwcli_assert(cmdStr != NULL);
+    lwcli_assert(helpStr != NULL);
+    lwcli_assert(userCallback != NULL);
     if (strlen(cmdStr) > LWCLI_COMMAND_STR_MAX_LENGTH)
     {
         lwcli_output_string("command string too long please modify LWCLI_COMMAND_STR_MAX_LENGTH \r\n", strlen("command string too long please modify LWCLI_COMMAND_STR_MAX_LENGTH \r\n"));
@@ -199,11 +215,6 @@ void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback)
     if (strlen(helpStr) > LWCLI_HELP_STR_MAX_LENGTH)
     {
         lwcli_output_string("help string too long please modify LWCLI_HELP_STR_MAX_LENGTH \r\n", strlen("help string too long please modify LWCLI_HELP_STR_MAX_LENGTH \r\n"));
-        return;
-    }
-    if (cmdStr == NULL || helpStr == NULL || userCallback == NULL)
-    {
-        lwcli_output_string("command string or help string or callback function is null\r\n", strlen("command string or help string or callback function is null\r\n"));
         return;
     }
     lwcli_software_init(); // 保证能正确初始化
@@ -402,10 +413,10 @@ void lwcli_process_receive_char(char revChar)
  * @return 1 匹配成功
  * @return 0 匹配失败
  */
-static uint8_t lwcli_match_command(char *inputStr, char *expected_command)
+static uint8_t lwcli_match_command(const char *inputStr, const char *expected_command)
 {
-    static char cmd_buffer[LWCLI_COMMAND_STR_MAX_LENGTH] = {0};
-    if (sscanf(inputStr, "%255s", cmd_buffer) != 1) {
+    static char cmd_buffer[LWCLI_COMMAND_STR_MAX_LENGTH + 1] = {0};
+    if (sscanf(inputStr, "%"LWCLI_COMMAND_STR_MAX_LENGTH_STR"s", cmd_buffer) != 1) {
         return 0;  // 输入为空
     }
 
@@ -584,7 +595,7 @@ static bool lwcli_history_is_empty()
  * @brief 添加一条历史命令
  * @param cmdStr 命令字符串
  */
-static void lwcli_add_history_command(char *cmdStr)
+static void lwcli_add_history_command(const char *cmdStr)
 {
     if (lwcli_history_is_full())
     {
@@ -744,7 +755,7 @@ static void lwcli_history_command_down(char *cmdStr)
  * @param str 字符串
  * @param color 颜色
  */
-static void lwcli_output_string_withcolor(char *str, colorEnum_e color)
+static void lwcli_output_string_withcolor(const char *str, colorEnum_e color)
 {
     lwcli_output_string(colorTable[color], strlen(colorTable[color]));
     lwcli_output_string(str, strlen(str));

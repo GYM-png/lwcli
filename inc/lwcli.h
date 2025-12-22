@@ -33,7 +33,7 @@ typedef void (*cliCmdFunc)(int argc, char* argv[]);
  * @param helpStr 帮助字符串 
  * @param userCallback 用户自定义命令处理函数
  */
-void lwcli_regist_command(char *cmdStr, char *helpStr, cliCmdFunc userCallback);
+void lwcli_regist_command(const char *cmdStr, const char *helpStr, cliCmdFunc userCallback);
 
 
 /**
