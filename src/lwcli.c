@@ -44,10 +44,9 @@ typedef struct
     /** 数组中存储的数值依次为第一条到最后一条命令在缓冲区中的位置 */
     uint16_t findPosIndex[LWCLI_HISTORY_COMMAND_NUM];
 }historyList_t;
-static void lwcli_add_history_command(const char *cmdStr);
-static void lwcli_history_list_update(void);
-static void lwcli_history_command_down(char *cmdStr);
-static void lwcli_history_command_up(char *cmdStr);
+static void lwcli_add_history_command(void);
+static void lwcli_history_command_down(void);
+static void lwcli_history_command_up(void);
 #endif  // LWCLI_HISTORY_COMMAND_NUM > 0
 
 #if (LWCLI_WITH_FILE_SYSTEM == true)
@@ -87,6 +86,7 @@ typedef struct
     char inputBuffer[LWCLI_RECEIVE_BUFFER_SIZE];
     char ouputBuffer[LWCLI_SHELL_OUTPUT_BUFFER_SIZE];
     uint16_t inputBufferPos;
+    uint16_t cursorPos;
 
 #if (LWCLI_HISTORY_COMMAND_NUM > 0)
     historyList_t historyList; // 历史记录表
@@ -94,8 +94,6 @@ typedef struct
 }lwcli_t;
 
 static lwcli_t lwcliObj = {0};
-
-static bool findHistoryEnable = false;
 
 /** 静态函数声明 **/
 static void lwcli_help(int argc, char* argv[]);
@@ -294,26 +292,20 @@ static void lwcli_printf(const char *format, ...)
  */
 void lwcli_process_receive_char(char revChar)
 {
-    static uint16_t cursorPosNow = 0;
     static uint8_t ansiKey = 0;
     if (revChar == '\r' || revChar == '\n')
     {
         lwcliObj.inputBuffer[lwcliObj.inputBufferPos] = '\0';
-        lwcli_output_string("\r\n", strlen("\r\n"));
+        lwcli_output_string("\r\n", 2);
         lwcli_process_command(lwcliObj.inputBuffer);
         #if (LWCLI_HISTORY_COMMAND_NUM > 0)
         if (lwcliObj.inputBufferPos > 0){
-            lwcli_add_history_command(lwcliObj.inputBuffer);
+            lwcli_add_history_command();
         }
         #endif // LWCLI_HISTORY_COMMAND_NUM > 0
         memset(lwcliObj.inputBuffer, 0, sizeof(lwcliObj.inputBuffer));
         lwcliObj.inputBufferPos = 0;
-        cursorPosNow = 0;
-        cursorPosNow = lwcliObj.inputBufferPos;
-        findHistoryEnable = true;
-        #if (LWCLI_HISTORY_COMMAND_NUM > 0)
-        lwcli_history_list_update();
-        #endif
+        lwcliObj.cursorPos = 0;
     }
     else if ((revChar == '\b' || revChar == ansi_delete))
     {
@@ -321,22 +313,21 @@ void lwcli_process_receive_char(char revChar)
         {
             return;
         }
-        if (cursorPosNow == lwcliObj.inputBufferPos)
+        if (lwcliObj.cursorPos == lwcliObj.inputBufferPos)
         {
             lwcliObj.inputBuffer[--lwcliObj.inputBufferPos] = '\0';
             lwcli_printf(lwcli_delete);
-            findHistoryEnable = (lwcliObj.inputBufferPos == 0) ? true : false;
-            cursorPosNow = lwcliObj.inputBufferPos;
+            lwcliObj.cursorPos = lwcliObj.inputBufferPos;
         }
-        else if (cursorPosNow > 0)
+        else if (lwcliObj.cursorPos > 0)
         {
-            for (size_t i = cursorPosNow - 1; i < lwcliObj.inputBufferPos; i++) // 字符串缓存处理，保证cmdStrBuffer中存储的字符串和屏幕一致
+            for (size_t i = lwcliObj.cursorPos - 1; i < lwcliObj.inputBufferPos; i++) // 字符串缓存处理，保证cmdStrBuffer中存储的字符串和屏幕一致
             {
                 lwcliObj.inputBuffer[i] = lwcliObj.inputBuffer[i + 1];
             }
-            lwcli_printf("%s%s%s%s%s", ansi_clear_behind, lwcli_delete, ansi_cursor_save, &lwcliObj.inputBuffer[cursorPosNow - 1], ansi_cursor_restore);
+            lwcli_printf("%s%s%s%s%s", ansi_clear_behind, lwcli_delete, ansi_cursor_save, &lwcliObj.inputBuffer[lwcliObj.cursorPos - 1], ansi_cursor_restore);
             lwcliObj.inputBufferPos--;
-            cursorPosNow--;
+            lwcliObj.cursorPos--;
         }
     }
     else if (revChar == '\033')
@@ -347,24 +338,24 @@ void lwcli_process_receive_char(char revChar)
     {
         if (ansiKey == 0)
         {
-            if (cursorPosNow == lwcliObj.inputBufferPos)  // 普通字符且光标处于最后
+            lwcli_assert(lwcliObj.inputBufferPos < sizeof(lwcliObj.inputBuffer) - 1);
+            if (lwcliObj.cursorPos == lwcliObj.inputBufferPos)  // 普通字符且光标处于最后
             {
                 lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = revChar;
-                cursorPosNow = lwcliObj.inputBufferPos;
-                findHistoryEnable = false;
+                lwcliObj.cursorPos = lwcliObj.inputBufferPos;
                 lwcli_output_char(revChar);
             }
             else    // 普通字符但光标不是在最后
             {
-                lwcli_printf("%c%s%s%s", revChar, ansi_cursor_save, lwcliObj.inputBuffer + cursorPosNow, ansi_cursor_restore);
+                lwcli_printf("%c%s%s%s", revChar, ansi_cursor_save, lwcliObj.inputBuffer + lwcliObj.cursorPos, ansi_cursor_restore);
                 
-                for (size_t i = lwcliObj.inputBufferPos; i > cursorPosNow; i--) // 字符串缓存处理，保证cmdStrBuffer中存储的字符串和屏幕一致
+                for (size_t i = lwcliObj.inputBufferPos; i > lwcliObj.cursorPos; i--) // 字符串缓存处理，保证cmdStrBuffer中存储的字符串和屏幕一致
                 {
                     lwcliObj.inputBuffer[i] = lwcliObj.inputBuffer[i - 1];
                 }
-                lwcliObj.inputBuffer[cursorPosNow] = revChar;
+                lwcliObj.inputBuffer[lwcliObj.cursorPos] = revChar;
                 lwcliObj.inputBufferPos++;
-                cursorPosNow++;
+                lwcliObj.cursorPos++;
             }
         }
         else if (ansiKey == 1)
@@ -376,32 +367,28 @@ void lwcli_process_receive_char(char revChar)
             ansiKey = 0;
             if (revChar == 'C')
             {
-                if (cursorPosNow < lwcliObj.inputBufferPos)
+                if (lwcliObj.cursorPos < lwcliObj.inputBufferPos)
                 {
-                    cursorPosNow++;
+                    lwcliObj.cursorPos++;
                     lwcli_output_string(ansi_cursor_right, sizeof(ansi_cursor_right));
                 }
             }
             else if (revChar == 'D')
             {
-                if (cursorPosNow > 0)
+                if (lwcliObj.cursorPos > 0)
                 {
-                    cursorPosNow--;
+                    lwcliObj.cursorPos--;
                     lwcli_output_string(ansi_cursor_left, sizeof(ansi_cursor_left));
                 }
             }
             #if (LWCLI_HISTORY_COMMAND_NUM > 0)
             else if (revChar == 'A')
             {
-                lwcli_history_command_up(lwcliObj.inputBuffer);
-                lwcli_output_string(lwcliObj.inputBuffer, strlen(lwcliObj.inputBuffer));
-                cursorPosNow = lwcliObj.inputBufferPos;
+                lwcli_history_command_up();
             }
             else if (revChar == 'B')
             {
-                lwcli_history_command_down(lwcliObj.inputBuffer);
-                lwcli_output_string(lwcliObj.inputBuffer, strlen(lwcliObj.inputBuffer));
-                cursorPosNow = lwcliObj.inputBufferPos;
+                lwcli_history_command_down();
             }
             #endif // LWCLI_HISTORY_COMMAND_NUM > 0
         }
@@ -595,16 +582,15 @@ static bool lwcli_history_is_empty()
 
 /**
  * @brief 添加一条历史命令
- * @param cmdStr 命令字符串
  */
-static void lwcli_add_history_command(const char *cmdStr)
+static void lwcli_add_history_command(void)
 {
     if (lwcli_history_is_full())
     {
         HISTORY_UPDATE_READ_INDEX();
     }
-    memcpy(lwcliObj.historyList.buffer + (lwcliObj.historyList.writePos * lwcliObj.historyList.commandStrSize), cmdStr, strlen(cmdStr));
-    lwcliObj.historyList.buffer[lwcliObj.historyList.writePos * lwcliObj.historyList.commandStrSize + strlen(cmdStr)] = '\0';
+    memcpy(lwcliObj.historyList.buffer + (lwcliObj.historyList.writePos * lwcliObj.historyList.commandStrSize), lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
+    lwcliObj.historyList.buffer[lwcliObj.historyList.writePos * lwcliObj.historyList.commandStrSize + lwcliObj.inputBufferPos] = '\0';
     HISTORY_UPDATE_WRITE_INDEX();
     lwcliObj.historyList.findPos = lwcliObj.historyList.writePos;
 
@@ -628,29 +614,13 @@ static void lwcli_add_history_command(const char *cmdStr)
     }
 }
 
-/**
- * @brief 更新历史命令中的一些状态
- */
-static void lwcli_history_list_update(void)
-{
-    if (lwcli_history_is_full())
-    {
-        lwcliObj.historyList.findPos = LWCLI_HISTORY_COMMAND_NUM;
-    }
-    else
-    {
-        lwcliObj.historyList.findPos = lwcliObj.historyList.writePos;
-    }
-    memset(lwcliObj.inputBuffer, 0, LWCLI_RECEIVE_BUFFER_SIZE);
-    lwcliObj.inputBufferPos = 0;
-}
 
 
 /**
  * @brief 读取上一条历史命令
  * @param cmdStr 读取到的命令字符串
  */
-static void lwcli_history_command_up(char *cmdStr)
+static void lwcli_history_command_up(void)
 {
     uint16_t historyCmdPos = lwcliObj.historyList.findPosIndex[0]; 
 
@@ -672,21 +642,19 @@ static void lwcli_history_command_up(char *cmdStr)
         historyCommandLen++;
         cmdChar = lwcliObj.historyList.buffer[historyCmdPos * lwcliObj.historyList.commandStrSize + historyCommandLen];
     }
-    memcpy(cmdStr, lwcliObj.historyList.buffer + (historyCmdPos * lwcliObj.historyList.commandStrSize), lwcliObj.historyList.commandStrSize);
     memcpy(lwcliObj.inputBuffer, lwcliObj.historyList.buffer + (historyCmdPos * lwcliObj.historyList.commandStrSize), lwcliObj.historyList.commandStrSize);
-    cmdStr[historyCommandLen] = '\0';
     lwcliObj.inputBuffer[historyCommandLen] = '\0';
     lwcliObj.inputBufferPos = historyCommandLen;
 
-    // 删除之前打印的命令
     lwcli_output_string(ansi_claer_line, sizeof(ansi_claer_line));
+    lwcli_output_string(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
+    lwcliObj.cursorPos = lwcliObj.inputBufferPos;
 }
 
 /**
  * @brief 获取历史命令的下一个
- * @param cmdStr 存放提取出的参数
  */
-static void lwcli_history_command_down(char *cmdStr)
+static void lwcli_history_command_down(void)
 {
     uint16_t historyCmdPos = lwcliObj.historyList.findPosIndex[0]; 
 
@@ -700,8 +668,9 @@ static void lwcli_history_command_down(char *cmdStr)
         if (lwcliObj.historyList.findPos >= LWCLI_HISTORY_COMMAND_NUM - 1) // 还没有使用UP键，则不允许使用Down 或者 Down到最后一个了
         {
             lwcli_output_string(ansi_claer_line, sizeof(ansi_claer_line));
-            cmdStr[0] = '\0';
-            lwcli_history_list_update();
+            lwcliObj.inputBuffer[0] = '\0';
+            lwcliObj.inputBufferPos = 0;
+            lwcliObj.cursorPos = 0;
             return;
         }
         else
@@ -718,8 +687,9 @@ static void lwcli_history_command_down(char *cmdStr)
         if (lwcliObj.historyList.findPos >= lwcliObj.historyList.writePos - 1)   // 还没有使用UP键，则不允许使用Down 或者 Down到最后一个了
         {
             lwcli_output_string(ansi_claer_line, sizeof(ansi_claer_line));
-            cmdStr[0] = '\0';
-            lwcli_history_list_update();
+            lwcliObj.inputBuffer[0] = '\0';
+            lwcliObj.inputBufferPos = 0;
+            lwcliObj.cursorPos = 0;
             return;
         }
         else
@@ -738,14 +708,14 @@ static void lwcli_history_command_down(char *cmdStr)
         historyCommandLen++;
         cmdChar = lwcliObj.historyList.buffer[historyCmdPos * lwcliObj.historyList.commandStrSize + historyCommandLen];
     }
-    memcpy(cmdStr, lwcliObj.historyList.buffer + (historyCmdPos * lwcliObj.historyList.commandStrSize), lwcliObj.historyList.commandStrSize);
     memcpy(lwcliObj.inputBuffer, lwcliObj.historyList.buffer + (historyCmdPos * lwcliObj.historyList.commandStrSize), lwcliObj.historyList.commandStrSize);
-    cmdStr[historyCommandLen] = '\0';
     lwcliObj.inputBuffer[historyCommandLen] = '\0';
     lwcliObj.inputBufferPos = historyCommandLen;
 
-    // 删除之前打印的命令
     lwcli_output_string(ansi_claer_line, sizeof(ansi_claer_line));
+    lwcli_output_string(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
+    lwcliObj.cursorPos = lwcliObj.inputBufferPos;
+
 }
 
 #endif // LWCLI_HISTORY_COMMAND_NUM > 0
