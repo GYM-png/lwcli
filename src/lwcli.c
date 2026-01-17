@@ -74,7 +74,7 @@ static char *colorTable[] = {
 };
 #define LWCLI_ANSI_COLOR_RESET "\x1B[0m"
 
-static void lwcli_output_string_withcolor(char *str, colorEnum_e color);
+static void lwcli_output_string_withcolor(const char *str, colorEnum_e color);
 void lwcli_output_file_path(void);
 #endif  // LWCLI_WITH_FILE_SYSTEM == true
 
@@ -102,6 +102,7 @@ static uint8_t lwcli_find_parameters(const char *argv_str, char **parameter_arry
 static uint8_t lwcli_get_parameter_number(const char *command_string);
 static void lwcli_process_command(char *cmdStr);
 static void lwcli_printf(const char *format, ...);
+static void lwcli_table_func(void);
 
 /** lwcli_port 接口 **/
 extern void *lwcli_malloc(size_t size);
@@ -191,6 +192,7 @@ void lwcli_software_init(void)
         lwcliObj.historyList.findPos = 0;
 
         memset(lwcliObj.historyList.buffer, 0, LWCLI_HISTORY_COMMAND_NUM * LWCLI_RECEIVE_BUFFER_SIZE);
+        #endif // LWCLI_HISTORY_COMMAND_NUM > 0
         lwcli_printf("%s\n"," ___                        ___           ");
         lwcli_printf("%s\n","/\\_ \\                      /\\_ \\    __    ");
         lwcli_printf("%s\n","\\//\\ \\    __  __  __    ___\\//\\ \\  /\\_\\   ");
@@ -200,7 +202,10 @@ void lwcli_software_init(void)
         lwcli_printf("%s\n","   \\/____/ \\/__//__/   \\/____/\\/____/ \\/_/");
         lwcli_printf("%s\n","                                          ");
         lwcli_printf("%s\n","                                          ");
-        #endif // LWCLI_HISTORY_COMMAND_NUM > 0
+        #if (LWCLI_WITH_FILE_SYSTEM == true)
+        lwcli_output_file_path();
+        #endif // LWCLI_WITH_FILE_SYSTEM == true
+
     }
 }
 
@@ -255,6 +260,7 @@ static void lwcli_help(int argc, char* argv[])
 {
     cmdList_t *node = lwcliObj.cmdListHead->next;
     uint16_t output_len = 0;
+    memset(lwcliObj.ouputBuffer, 0, sizeof(lwcliObj.ouputBuffer));
     while(node)
     {
         if (node->helpStr[0] != '\0')
@@ -262,7 +268,7 @@ static void lwcli_help(int argc, char* argv[])
             memcpy(lwcliObj.ouputBuffer, node->cmdStr, node->cmdLen);
             output_len = node->cmdLen;
             lwcliObj.ouputBuffer[output_len++] = ':';
-            for (uint16_t i = 0; i < (LWCLI_COMMAND_STR_MAX_LENGTH - (node->cmdLen + 1) + 4); i++)  // 打印空格对齐
+            for (uint16_t i = 0; i < (LWCLI_COMMAND_STR_MAX_LENGTH + 3 - (node->cmdLen + 1) + 4); i++)  // 打印空格对齐
             {
                 lwcliObj.ouputBuffer[output_len++] = ' ';
             }
@@ -270,8 +276,8 @@ static void lwcli_help(int argc, char* argv[])
             memcpy(lwcliObj.ouputBuffer + output_len, node->helpStr, helpStrLen);
             output_len += helpStrLen;
             lwcliObj.ouputBuffer[output_len++] = '\r';
-            lwcliObj.ouputBuffer[output_len++] = '\r';
             lwcliObj.ouputBuffer[output_len++] = '\n';
+            lwcliObj.ouputBuffer[output_len++] = '\r';
             lwcliObj.ouputBuffer[output_len++] = '\n';
             lwcli_output(lwcliObj.ouputBuffer, output_len);
         }
@@ -286,6 +292,9 @@ static void lwcli_clear(int argc, char* argv[])
 {
     lwcli_output(ansi_clear_screen, sizeof(ansi_clear_screen));
     lwcli_printf(ansi_cursor_move_to, 0, 0);
+    #if (LWCLI_WITH_FILE_SYSTEM == true)
+    lwcli_output_file_path();
+    #endif // LWCLI_WITH_FILE_SYSTEM == true
 }
 
 /**
@@ -345,6 +354,10 @@ void lwcli_process_receive_char(char revChar)
             lwcliObj.inputBufferPos--;
             lwcliObj.cursorPos--;
         }
+    }
+    else if (revChar == '\t')
+    {
+        lwcli_table_func();
     }
     else if (revChar == '\033')
     {
@@ -448,7 +461,7 @@ static void lwcli_process_command(char *cmdStr)
                 node->callBack(0, NULL);
                 #if (LWCLI_WITH_FILE_SYSTEM == true)
                 lwcli_output_file_path();
-                #endif  
+                #endif  // LWCLI_WITH_FILE_SYSTEM == true
                 return;
             }
             else
@@ -468,17 +481,17 @@ static void lwcli_process_command(char *cmdStr)
                 lwcli_free(parameterArray);
                 #if (LWCLI_WITH_FILE_SYSTEM == true)
                 lwcli_output_file_path();
-                #endif   
+                #endif // LWCLI_WITH_FILE_SYSTEM == true 
                 return;
             }         
         }
         node = node->next;
     }
-#if (LWCLI_WITH_FILE_SYSTEM == false)
+
     lwcli_printf(lwcli_reminder, cmdStr);
-#else
+#if (LWCLI_WITH_FILE_SYSTEM == true)
     lwcli_output_file_path();
-#endif
+#endif // LWCLI_WITH_FILE_SYSTEM == true
 }
 
 /**
@@ -573,6 +586,84 @@ static uint8_t lwcli_find_parameters(const char *argv_str, char **parameter_arry
     return found_num;
 }
 
+
+/**
+ * @brief tab补全
+ */
+static void lwcli_table_func(void)
+{
+    const char *prefix = lwcliObj.inputBuffer;
+    cmdList_t *node = lwcliObj.cmdListHead;
+    uint16_t match_num = 0;
+    if (!lwcliObj.inputBufferPos)
+    {
+        return;
+    }
+    while (node) 
+    {
+        if (lwcliObj.inputBufferPos < node->cmdLen)
+        {
+            if (strncmp(node->cmdStr, prefix, lwcliObj.inputBufferPos) == 0) 
+            {
+                match_num++;
+            }
+        }
+        node = node->next;
+    }
+
+    node = lwcliObj.cmdListHead;
+    if (match_num == 0)
+    {
+        return;
+    }
+    else if (match_num == 1)
+    {
+        while (node) 
+        {
+            if (lwcliObj.inputBufferPos < node->cmdLen)
+            {
+                if (strncmp(node->cmdStr, prefix, lwcliObj.inputBufferPos) == 0) 
+                {
+                    memcpy(lwcliObj.inputBuffer, node->cmdStr, node->cmdLen);
+                    lwcliObj.inputBufferPos = node->cmdLen;
+                    lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = ' ';
+                    lwcliObj.cursorPos = lwcliObj.inputBufferPos;
+                    lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
+                    #if (LWCLI_WITH_FILE_SYSTEM == true)
+                    lwcli_output_file_path();
+                    #endif // LWCLI_WITH_FILE_SYSTEM == true
+                    lwcli_output(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
+                }
+            }
+            node = node->next;
+        }
+
+    }
+    else
+    {
+        lwcli_output("\r\n", 2);
+        while (node) 
+        {
+            if (strncmp(node->cmdStr, prefix, lwcliObj.inputBufferPos) == 0) 
+            {
+                lwcli_output(node->cmdStr, node->cmdLen);
+                lwcli_output("     ", 5);
+            }
+            node = node->next;
+        }
+        #if (LWCLI_WITH_FILE_SYSTEM == true)
+        lwcli_output("\r\n", 2);
+        lwcli_output_file_path();
+        lwcli_output(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
+        #else
+        __output:
+        uint16_t output_len = snprintf(lwcliObj.ouputBuffer, sizeof(lwcliObj.ouputBuffer), "\r\n%s", lwcliObj.inputBuffer);
+        lwcli_output(lwcliObj.ouputBuffer, output_len);
+        #endif // LWCLI_WITH_FILE_SYSTEM == true
+        
+    }
+}
+
 #if (LWCLI_HISTORY_COMMAND_NUM > 0)
 #define HISTORY_UPDATE_READ_INDEX()      do {lwcliObj.historyList.readPos = (lwcliObj.historyList.readPos + 1) % lwcliObj.historyList.recordHistoryNum; if (!lwcliObj.historyList.readPos) lwcliObj.historyList.readMirror ^= 1;} while(0)
 #define HISTORY_UPDATE_WRITE_INDEX()     do {lwcliObj.historyList.writePos = (lwcliObj.historyList.writePos + 1) % lwcliObj.historyList.recordHistoryNum; if (!lwcliObj.historyList.writePos) lwcliObj.historyList.writeMirror ^= 1;} while(0)
@@ -663,6 +754,9 @@ static void lwcli_history_command_up(void)
     lwcliObj.inputBufferPos = historyCommandLen;
 
     lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
+    #if (LWCLI_WITH_FILE_SYSTEM == true)
+    lwcli_output_file_path();
+    #endif // LWCLI_WITH_FILE_SYSTEM == true
     lwcli_output(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
     lwcliObj.cursorPos = lwcliObj.inputBufferPos;
 }
@@ -684,6 +778,9 @@ static void lwcli_history_command_down(void)
         if (lwcliObj.historyList.findPos >= LWCLI_HISTORY_COMMAND_NUM - 1) // 还没有使用UP键，则不允许使用Down 或者 Down到最后一个了
         {
             lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
+            #if (LWCLI_WITH_FILE_SYSTEM == true)
+            lwcli_output_file_path();
+            #endif // LWCLI_WITH_FILE_SYSTEM == true
             lwcliObj.inputBuffer[0] = '\0';
             lwcliObj.inputBufferPos = 0;
             lwcliObj.cursorPos = 0;
@@ -703,6 +800,9 @@ static void lwcli_history_command_down(void)
         if (lwcliObj.historyList.findPos >= lwcliObj.historyList.writePos - 1)   // 还没有使用UP键，则不允许使用Down 或者 Down到最后一个了
         {
             lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
+            #if (LWCLI_WITH_FILE_SYSTEM == true)
+            lwcli_output_file_path();
+            #endif // LWCLI_WITH_FILE_SYSTEM == true
             lwcliObj.inputBuffer[0] = '\0';
             lwcliObj.inputBufferPos = 0;
             lwcliObj.cursorPos = 0;
@@ -729,6 +829,9 @@ static void lwcli_history_command_down(void)
     lwcliObj.inputBufferPos = historyCommandLen;
 
     lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
+    #if (LWCLI_WITH_FILE_SYSTEM == true)
+    lwcli_output_file_path();
+    #endif // LWCLI_WITH_FILE_SYSTEM == true
     lwcli_output(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
     lwcliObj.cursorPos = lwcliObj.inputBufferPos;
 
@@ -745,9 +848,7 @@ static void lwcli_history_command_down(void)
  */
 static void lwcli_output_string_withcolor(const char *str, colorEnum_e color)
 {
-    lwcli_output(colorTable[color], strlen(colorTable[color]));
-    lwcli_output(str, strlen(str));
-    lwcli_output(LWCLI_ANSI_COLOR_RESET, strlen(LWCLI_ANSI_COLOR_RESET));
+    lwcli_printf("%s%s%s", colorTable[color], str, LWCLI_ANSI_COLOR_RESET);
 }
 
 /**
@@ -756,7 +857,7 @@ static void lwcli_output_string_withcolor(const char *str, colorEnum_e color)
 void lwcli_output_file_path(void)
 {
     char *filePath = lwcli_get_file_path();
-    lwcli_output_string_withcolor(LWCLI_USER_NAME ":", COLOR_GREEN);
+    lwcli_output_string_withcolor(LWCLI_USER_NAME":", COLOR_GREEN);
     lwcli_output_string_withcolor(filePath, COLOR_BLUE);
     lwcli_output("$ ", 2);
 }
