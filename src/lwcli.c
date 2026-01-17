@@ -292,9 +292,6 @@ static void lwcli_clear(int argc, char* argv[])
 {
     lwcli_output(ansi_clear_screen, sizeof(ansi_clear_screen));
     lwcli_printf(ansi_cursor_move_to, 0, 0);
-    #if (LWCLI_WITH_FILE_SYSTEM == true)
-    lwcli_output_file_path();
-    #endif // LWCLI_WITH_FILE_SYSTEM == true
 }
 
 /**
@@ -586,6 +583,33 @@ static uint8_t lwcli_find_parameters(const char *argv_str, char **parameter_arry
     return found_num;
 }
 
+/**
+ * @brief 计算最大补全长度
+ * @param argc 匹配的命令数量
+ * @param argv 匹配的命令
+ * @return 最大补全长度
+ */
+int lwcli_longest_common_prefix_length(int argc, char *argv[])
+{
+    if (argc <= 0 || !argv) return 0;
+    if (argc == 1) return argv[0] ? strlen(argv[0]) : 0;
+
+    const char *base = argv[0];
+    size_t len = 0;
+
+    while (*base) {                     // 只要基准字符串没结束
+        for (int i = 1; i < argc; i++) {
+            if (!argv[i][len] || argv[i][len] != *base) {
+                return (int)len;
+            }
+        }
+        len++;
+        base++;
+    }
+
+    // 走到这里说明 base 字符串是所有字符串的前缀
+    return (int)len;
+}
 
 /**
  * @brief tab补全
@@ -639,25 +663,44 @@ static void lwcli_table_func(void)
         }
 
     }
-    else
-    {
-        lwcli_output("\r\n", 2);
+    else {
+        char **match_arr = NULL;
+        uint16_t match_index = 0;
+        match_arr = (char **)lwcli_malloc(sizeof(char *)  * match_num);
+        if (match_arr == NULL){
+            return;
+        }
+
         while (node) 
         {
             if (strncmp(node->cmdStr, prefix, lwcliObj.inputBufferPos) == 0) 
             {
-                lwcli_output(node->cmdStr, node->cmdLen);
-                lwcli_output("     ", 5);
+                match_arr[match_index++] = node->cmdStr;
             }
             node = node->next;
         }
+
+        uint16_t match_max_len = lwcli_longest_common_prefix_length(match_num, match_arr);
+        lwcli_output("\r\n", 2);
+        for (uint16_t i = 0; i < match_num; i++)
+        {
+            lwcli_output(match_arr[i], strlen(match_arr[i]));
+            lwcli_output("     ", 5);
+        }
+        
+        while (lwcliObj.inputBufferPos < match_max_len)
+        {
+            lwcliObj.inputBuffer[lwcliObj.inputBufferPos] = match_arr[0][lwcliObj.inputBufferPos];
+            lwcliObj.inputBufferPos++;
+        }
+        lwcliObj.cursorPos = lwcliObj.inputBufferPos;
+
         #if (LWCLI_WITH_FILE_SYSTEM == true)
         lwcli_output("\r\n", 2);
         lwcli_output_file_path();
         lwcli_output(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
         #else
-        __output:
-        uint16_t output_len = snprintf(lwcliObj.ouputBuffer, sizeof(lwcliObj.ouputBuffer), "\r\n%s", lwcliObj.inputBuffer);
+        uint16_t output_len = snprintf(lwcliObj.ouputBuffer, sizeof(lwcliObj.ouputBuffer), "\r\n\r\n%s", lwcliObj.inputBuffer);
         lwcli_output(lwcliObj.ouputBuffer, output_len);
         #endif // LWCLI_WITH_FILE_SYSTEM == true
         
