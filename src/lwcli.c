@@ -638,7 +638,14 @@ static void lwcli_table_func(void)
     node = lwcliObj.cmdListHead;
     if (match_num == 0)
     {
-        return;
+        #if (LWCLI_WITH_FILE_SYSTEM == true)
+        lwcli_output("\r\n", 2);
+        lwcli_output_file_path();
+        lwcli_output(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
+        #else
+        uint16_t output_len = snprintf(lwcliObj.ouputBuffer, sizeof(lwcliObj.ouputBuffer), "\r\n\r\n%s", lwcliObj.inputBuffer);
+        lwcli_output(lwcliObj.ouputBuffer, output_len);
+        #endif // LWCLI_WITH_FILE_SYSTEM == true
     }
     else if (match_num == 1)
     {
