@@ -17,15 +17,19 @@
 
 #include "stdint.h"
 
-#define LWCLI_VERSION "V0.0.2"
+#define LWCLI_VERSION "V0.0.3"
 
+/**
+ * @brief lwcli 软件初始化
+ */
+void lwcli_software_init(void);
 
 /**
  * @brief 用户自定义命令处理函数
  * @param cmdParameterArry 参数数组
  * @param parameterNum 参数数量
  */
-typedef void (*cliCmdFunc)(int argc, char* argv[]);
+typedef void (*user_callback_f)(int argc, char* argv[]);
 
 /**
  * @brief 注册命令
@@ -33,7 +37,7 @@ typedef void (*cliCmdFunc)(int argc, char* argv[]);
  * @param helpStr 帮助字符串 
  * @param userCallback 用户自定义命令处理函数
  */
-void lwcli_regist_command(const char *cmdStr, const char *helpStr, cliCmdFunc userCallback);
+void lwcli_regist_command(const char *cmdStr, const char *helpStr, user_callback_f userCallback);
 
 
 /**

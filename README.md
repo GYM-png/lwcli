@@ -44,7 +44,7 @@
    ```
 
 2. 配置硬件接口：
-    - 编辑 `lwcli_port.c` 中的接口函数 (`lwcli_malloc`, `lwcli_free`, `lwcli_hardware_init`, `lwcli_output_char`, `lwcli_output_string`, `lwcli_receive`)，适配目标硬件平台。
+    - 编辑 `lwcli_port.c` 中的接口函数 (`lwcli_malloc`, `lwcli_free`, `lwcli_hardware_init`, `lwcli_output_char`, `lwcli_output`, `lwcli_receive`)，适配目标硬件平台。
     - 确保依赖的硬件驱动 (`usart_drv.h`, `mydebug.h`, `malloc.h`) 已正确配置。
 
 3. 编译项目：

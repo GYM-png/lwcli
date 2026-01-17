@@ -16,10 +16,9 @@ void test_func(int argc, char *argv[])
 
 int main(void)
 {
-    printf("********lwcli example start********\n");
     system("stty -icanon");
     system("stty -echo");
-
+    lwcli_software_init();
     lwcli_regist_command("test", "test command", test_func);
     while(1)
     {

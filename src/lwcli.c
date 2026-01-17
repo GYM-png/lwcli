@@ -21,7 +21,7 @@ typedef struct cmdList
     char cmdStr[LWCLI_COMMAND_STR_MAX_LENGTH];
     char helpStr[LWCLI_HELP_STR_MAX_LENGTH];
     uint8_t cmdLen;
-    cliCmdFunc callBack;
+    user_callback_f callBack;
     struct cmdList *next;
 }cmdList_t;
 
@@ -106,8 +106,7 @@ static void lwcli_printf(const char *format, ...);
 /** lwcli_port 接口 **/
 extern void *lwcli_malloc(size_t size);
 extern void lwcli_free(void *ptr);
-extern void lwcli_output_char(char output_char);
-extern void lwcli_output_string(const char *output_string, uint16_t string_len);
+extern void lwcli_output(const char *output_string, uint16_t string_len);
 #if (LWCLI_WITH_FILE_SYSTEM == true)
 extern char *lwcli_get_file_path(void);
 #endif  // LWCLI_WITH_FILE_SYSTEM == true
@@ -156,7 +155,7 @@ void lwcli_software_init(void)
         lwcliObj.cmdListHead = (cmdList_t *)lwcli_malloc(sizeof(cmdList_t));
         if (lwcliObj.cmdListHead == NULL)
         {
-            lwcli_output_string("lwcli malloc error\r\n", strlen("lwcli malloc error\r\n"));
+            lwcli_printf("lwcli malloc error\r\n");
             return;
         }
         lwcliObj.cmdListHead->cmdLen = strlen("help");
@@ -169,7 +168,7 @@ void lwcli_software_init(void)
         cmdList_t *clearNode = (cmdList_t *)lwcli_malloc(sizeof(cmdList_t));
         if (clearNode == NULL)
         {
-            lwcli_output_string("lwcli malloc error\r\n", strlen("lwcli malloc error\r\n"));
+            lwcli_printf("lwcli malloc error\r\n");
             return;
         }
         clearNode->cmdLen = strlen("clear");
@@ -192,6 +191,15 @@ void lwcli_software_init(void)
         lwcliObj.historyList.findPos = 0;
 
         memset(lwcliObj.historyList.buffer, 0, LWCLI_HISTORY_COMMAND_NUM * LWCLI_RECEIVE_BUFFER_SIZE);
+        lwcli_printf("%s\n"," ___                        ___           ");
+        lwcli_printf("%s\n","/\\_ \\                      /\\_ \\    __    ");
+        lwcli_printf("%s\n","\\//\\ \\    __  __  __    ___\\//\\ \\  /\\_\\   ");
+        lwcli_printf("%s\n","  \\ \\ \\  /\\ \\/\\ \\/\\ \\  /'___\\\\ \\ \\ \\/\\ \\  ");
+        lwcli_printf("%s\n","   \\_\\ \\_\\ \\ \\_/ \\_/ \\/\\ \\__/ \\_\\ \\_\\ \\ \\ ");
+        lwcli_printf("%s\n","   /\\____\\\\ \\___x___/'\\ \\____\\/\\____\\\\ \\_\\");
+        lwcli_printf("%s\n","   \\/____/ \\/__//__/   \\/____/\\/____/ \\/_/");
+        lwcli_printf("%s\n","                                          ");
+        lwcli_printf("%s\n","                                          ");
         #endif // LWCLI_HISTORY_COMMAND_NUM > 0
     }
 }
@@ -202,19 +210,19 @@ void lwcli_software_init(void)
  * @param helpStr 帮助字符串
  * @param userCallback 用户回调函数
  */
-void lwcli_regist_command(const char *cmdStr, const char *helpStr, cliCmdFunc userCallback)
+void lwcli_regist_command(const char *cmdStr, const char *helpStr, user_callback_f userCallback)
 {
     lwcli_assert(cmdStr != NULL);
     lwcli_assert(helpStr != NULL);
     lwcli_assert(userCallback != NULL);
     if (strlen(cmdStr) > LWCLI_COMMAND_STR_MAX_LENGTH)
     {
-        lwcli_output_string("command string too long please modify LWCLI_COMMAND_STR_MAX_LENGTH \r\n", strlen("command string too long please modify LWCLI_COMMAND_STR_MAX_LENGTH \r\n"));
+        lwcli_printf("command string too long please modify LWCLI_COMMAND_STR_MAX_LENGTH \r\n");
         return;
     }
     if (strlen(helpStr) > LWCLI_HELP_STR_MAX_LENGTH)
     {
-        lwcli_output_string("help string too long please modify LWCLI_HELP_STR_MAX_LENGTH \r\n", strlen("help string too long please modify LWCLI_HELP_STR_MAX_LENGTH \r\n"));
+        lwcli_printf("help string too long please modify LWCLI_HELP_STR_MAX_LENGTH \r\n");
         return;
     }
     lwcli_software_init(); // 保证能正确初始化
@@ -222,7 +230,7 @@ void lwcli_regist_command(const char *cmdStr, const char *helpStr, cliCmdFunc us
     cmdList_t *pnode = lwcliObj.cmdListHead;
     if (newNode == NULL)
     {
-        lwcli_output_string("lwcli malloc error\r\n", strlen("lwcli malloc error\r\n"));
+        lwcli_printf("lwcli malloc error\r\n");
         return;
     }
     newNode->cmdLen = strlen(cmdStr);
@@ -246,18 +254,26 @@ void lwcli_regist_command(const char *cmdStr, const char *helpStr, cliCmdFunc us
 static void lwcli_help(int argc, char* argv[])
 {
     cmdList_t *node = lwcliObj.cmdListHead->next;
+    uint16_t output_len = 0;
     while(node)
     {
         if (node->helpStr[0] != '\0')
         {
-            lwcli_output_string(node->cmdStr, node->cmdLen);
-            lwcli_output_char(':');
+            memcpy(lwcliObj.ouputBuffer, node->cmdStr, node->cmdLen);
+            output_len = node->cmdLen;
+            lwcliObj.ouputBuffer[output_len++] = ':';
             for (uint16_t i = 0; i < (LWCLI_COMMAND_STR_MAX_LENGTH - (node->cmdLen + 1) + 4); i++)  // 打印空格对齐
             {
-                lwcli_output_char(' ');
+                lwcliObj.ouputBuffer[output_len++] = ' ';
             }
-            lwcli_output_string(node->helpStr, strlen(node->helpStr));
-            lwcli_output_string("\r\n\r\n", strlen("\r\n\r\n"));
+            uint16_t helpStrLen = strlen(node->helpStr);
+            memcpy(lwcliObj.ouputBuffer + output_len, node->helpStr, helpStrLen);
+            output_len += helpStrLen;
+            lwcliObj.ouputBuffer[output_len++] = '\r';
+            lwcliObj.ouputBuffer[output_len++] = '\r';
+            lwcliObj.ouputBuffer[output_len++] = '\n';
+            lwcliObj.ouputBuffer[output_len++] = '\n';
+            lwcli_output(lwcliObj.ouputBuffer, output_len);
         }
         node = node->next;
     }
@@ -268,7 +284,7 @@ static void lwcli_help(int argc, char* argv[])
  */
 static void lwcli_clear(int argc, char* argv[])
 {
-    lwcli_output_string(ansi_clear_screen, sizeof(ansi_clear_screen));
+    lwcli_output(ansi_clear_screen, sizeof(ansi_clear_screen));
     lwcli_printf(ansi_cursor_move_to, 0, 0);
 }
 
@@ -283,7 +299,7 @@ static void lwcli_printf(const char *format, ...)
     va_start(args, format);
     uint16_t print_len = vsnprintf(lwcliObj.ouputBuffer, sizeof(lwcliObj.ouputBuffer), format, args);
     va_end(args);
-    lwcli_output_string(lwcliObj.ouputBuffer, print_len);
+    lwcli_output(lwcliObj.ouputBuffer, print_len);
 }
 
 /**
@@ -296,7 +312,7 @@ void lwcli_process_receive_char(char revChar)
     if (revChar == '\r' || revChar == '\n')
     {
         lwcliObj.inputBuffer[lwcliObj.inputBufferPos] = '\0';
-        lwcli_output_string("\r\n", 2);
+        lwcli_output("\r\n", 2);
         lwcli_process_command(lwcliObj.inputBuffer);
         #if (LWCLI_HISTORY_COMMAND_NUM > 0)
         if (lwcliObj.inputBufferPos > 0){
@@ -343,7 +359,7 @@ void lwcli_process_receive_char(char revChar)
             {
                 lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = revChar;
                 lwcliObj.cursorPos = lwcliObj.inputBufferPos;
-                lwcli_output_char(revChar);
+                lwcli_output(&revChar, 1);
             }
             else    // 普通字符但光标不是在最后
             {
@@ -370,7 +386,7 @@ void lwcli_process_receive_char(char revChar)
                 if (lwcliObj.cursorPos < lwcliObj.inputBufferPos)
                 {
                     lwcliObj.cursorPos++;
-                    lwcli_output_string(ansi_cursor_right, sizeof(ansi_cursor_right));
+                    lwcli_output(ansi_cursor_right, sizeof(ansi_cursor_right));
                 }
             }
             else if (revChar == 'D')
@@ -378,7 +394,7 @@ void lwcli_process_receive_char(char revChar)
                 if (lwcliObj.cursorPos > 0)
                 {
                     lwcliObj.cursorPos--;
-                    lwcli_output_string(ansi_cursor_left, sizeof(ansi_cursor_left));
+                    lwcli_output(ansi_cursor_left, sizeof(ansi_cursor_left));
                 }
             }
             #if (LWCLI_HISTORY_COMMAND_NUM > 0)
@@ -440,7 +456,7 @@ static void lwcli_process_command(char *cmdStr)
                 char **parameterArray = (char **) lwcli_malloc(sizeof(char *) * parameter_num);
                 if (parameterArray == NULL)
                 {
-                    lwcli_output_string("error malloc\r\n", strlen("error malloc\r\n"));
+                    lwcli_printf("error malloc\r\n");
                     return;
                 }
                 uint8_t findParameterNum = lwcli_find_parameters(cmdParameter + node->cmdLen, parameterArray, parameter_num);
@@ -511,7 +527,7 @@ static uint8_t lwcli_find_parameters(const char *argv_str, char **parameter_arry
     uint8_t *index = (uint8_t*) lwcli_malloc(sizeof(uint8_t) * (parameter_num + 1));  // 增加一个元素用于最后一个参数
     if (index == NULL)
     {
-        lwcli_output_string("error malloc\r\n", strlen("error malloc\r\n"));
+        lwcli_printf("error malloc\r\n");
         return 0;
     }
 
@@ -541,7 +557,7 @@ static uint8_t lwcli_find_parameters(const char *argv_str, char **parameter_arry
         parameter_arry[i] = (char *)lwcli_malloc(param_len + 1);  // 分配内存
         if (parameter_arry[i] == NULL)//错误处理
         {
-            lwcli_output_string("error malloc\r\n", strlen("error malloc\r\n"));
+            lwcli_printf("error malloc\r\n");
             for (uint8_t j = 0; j < i; j++)
             {
                 lwcli_free(parameter_arry[j]);
@@ -646,8 +662,8 @@ static void lwcli_history_command_up(void)
     lwcliObj.inputBuffer[historyCommandLen] = '\0';
     lwcliObj.inputBufferPos = historyCommandLen;
 
-    lwcli_output_string(ansi_claer_line, sizeof(ansi_claer_line));
-    lwcli_output_string(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
+    lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
+    lwcli_output(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
     lwcliObj.cursorPos = lwcliObj.inputBufferPos;
 }
 
@@ -667,7 +683,7 @@ static void lwcli_history_command_down(void)
     {
         if (lwcliObj.historyList.findPos >= LWCLI_HISTORY_COMMAND_NUM - 1) // 还没有使用UP键，则不允许使用Down 或者 Down到最后一个了
         {
-            lwcli_output_string(ansi_claer_line, sizeof(ansi_claer_line));
+            lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
             lwcliObj.inputBuffer[0] = '\0';
             lwcliObj.inputBufferPos = 0;
             lwcliObj.cursorPos = 0;
@@ -686,7 +702,7 @@ static void lwcli_history_command_down(void)
     {
         if (lwcliObj.historyList.findPos >= lwcliObj.historyList.writePos - 1)   // 还没有使用UP键，则不允许使用Down 或者 Down到最后一个了
         {
-            lwcli_output_string(ansi_claer_line, sizeof(ansi_claer_line));
+            lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
             lwcliObj.inputBuffer[0] = '\0';
             lwcliObj.inputBufferPos = 0;
             lwcliObj.cursorPos = 0;
@@ -712,8 +728,8 @@ static void lwcli_history_command_down(void)
     lwcliObj.inputBuffer[historyCommandLen] = '\0';
     lwcliObj.inputBufferPos = historyCommandLen;
 
-    lwcli_output_string(ansi_claer_line, sizeof(ansi_claer_line));
-    lwcli_output_string(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
+    lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
+    lwcli_output(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
     lwcliObj.cursorPos = lwcliObj.inputBufferPos;
 
 }
@@ -729,9 +745,9 @@ static void lwcli_history_command_down(void)
  */
 static void lwcli_output_string_withcolor(const char *str, colorEnum_e color)
 {
-    lwcli_output_string(colorTable[color], strlen(colorTable[color]));
-    lwcli_output_string(str, strlen(str));
-    lwcli_output_string(LWCLI_ANSI_COLOR_RESET, strlen(LWCLI_ANSI_COLOR_RESET));
+    lwcli_output(colorTable[color], strlen(colorTable[color]));
+    lwcli_output(str, strlen(str));
+    lwcli_output(LWCLI_ANSI_COLOR_RESET, strlen(LWCLI_ANSI_COLOR_RESET));
 }
 
 /**
@@ -742,6 +758,6 @@ void lwcli_output_file_path(void)
     char *filePath = lwcli_get_file_path();
     lwcli_output_string_withcolor(LWCLI_USER_NAME ":", COLOR_GREEN);
     lwcli_output_string_withcolor(filePath, COLOR_BLUE);
-    lwcli_output_string("$ ", 2);
+    lwcli_output("$ ", 2);
 }
 #endif // LWCLI_WITH_FILE_SYSTEM == true

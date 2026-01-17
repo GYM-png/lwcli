@@ -42,7 +42,7 @@ Current version: `V0.0.1`
    ```
 
 2. Configure hardware interfaces:
-   - Modify `lwcli_port.c` to implement interface functions (`lwcli_malloc`, `lwcli_free`, `lwcli_hardware_init`, `lwcli_output_char`, `lwcli_output_string`, `lwcli_receive`) for your target hardware platform.
+   - Modify `lwcli_port.c` to implement interface functions (`lwcli_malloc`, `lwcli_free`, `lwcli_hardware_init`, `lwcli_output_char`, `lwcli_output`, `lwcli_receive`) for your target hardware platform.
    - Ensure hardware driver dependencies (`usart_drv.h`, `mydebug.h`, `malloc.h`) are properly configured.
 
 3. Build the project:

@@ -48,24 +48,19 @@ void lwcli_hardware_init(void)
 
 
 /**
- * @brief 字符输出函数
- * @param output_char 输出的字符
- */
-void lwcli_output_char(char output_char)
-{
-    /* add your output function here */
-    printf("%c", output_char);
-}
-
-/**
  * @brief 字符串输出函数
  * @param output_string 输出的字符串
  * @param string_len 字符串长度
  */
-void lwcli_output_string(const char *output_string, uint16_t string_len)
+void lwcli_output(const char *output_string, uint16_t string_len)
 {
     /* add your output function here */
-    printf("%s", output_string);
+    if (string_len == 1){
+        putchar(*output_string);
+    }
+    else{
+        printf("%s", output_string);
+    }
 }
 
 
