@@ -47,7 +47,7 @@
 /**
  * @brief 终端输出缓冲区大小
  */
-#define LWCLI_SHELL_OUTPUT_BUFFER_SIZE 128
+#define LWCLI_SHELL_OUTPUT_BUFFER_SIZE 512
 
 
 

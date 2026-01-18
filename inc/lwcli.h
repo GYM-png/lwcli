@@ -36,9 +36,18 @@ typedef void (*user_callback_f)(int argc, char* argv[]);
  * @param cmdStr 命令字符串 
  * @param helpStr 帮助字符串 
  * @param userCallback 用户自定义命令处理函数
+ * @return 命令描述符
  */
-void lwcli_regist_command(const char *cmdStr, const char *helpStr, user_callback_f userCallback);
+int lwcli_regist_command(const char *cmdStr, const char *helpStr, user_callback_f userCallback);
 
+
+/**
+ * @brief 注册命令详细说明
+ * @param command_fd 命令描述符 @brief lwcli_regist_command
+ * @param usage 命令的用法 可以为NULL
+ * @param description 详细的说明 可以为NULL
+ */
+void lwcli_regist_command_help(int command_fd, const char *usage, const char *description);
 
 /**
  * @brief 处理接收字符
@@ -47,18 +56,7 @@ void lwcli_regist_command(const char *cmdStr, const char *helpStr, user_callback
 void lwcli_process_receive_char(char revChar);
 
 
-#if (LWCLI_ENABLE_REMOTE_COMMAND == true)
-/**
- * @brief 写入远程命令
- * @param command 命令字符串
- * @param command_len 命令长度
- */
-void lwcli_write_remote_command(char *command, uint16_t command_len);
-#endif  // LWCLI_ENABLE_REMOTE_COMMAND
-
 #ifdef __cplusplus
     }
 #endif
-
-
 #endif //LWCLI_LWCLI_H

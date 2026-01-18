@@ -17,4 +17,15 @@
  */
 void lwcli_task_start(const uint16_t StackDepth, const uint8_t uxPriority);
 
+
+
+#if (LWCLI_ENABLE_REMOTE_COMMAND == true)
+/**
+ * @brief 写入远程命令
+ * @param command 命令字符串
+ * @param command_len 命令长度
+ */
+void lwcli_write_remote_command(char *command, uint16_t command_len);
+#endif  // LWCLI_ENABLE_REMOTE_COMMAND
+
 #endif // !__LWCLI_TASK_H
