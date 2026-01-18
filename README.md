@@ -12,26 +12,29 @@
 
 **lwcli** 是一个轻量级命令行界面 (CLI) 组件，专为嵌入式系统设计，用于实现高效的命令解析和处理。它支持动态命令注册、参数解析、命令历史记录等功能，适用于串口、USB 等多种硬件接口。lwcli 基于 C 语言开发，结合 FreeRTOS 实现任务管理，适合资源受限的嵌入式环境。
 
-当前版本：`V0.0.1`
+当前版本：`V0.0.4`
+
+![效果演示](/example.gif)
 
 ## 特性
 
-- **轻量级设计**：占用资源少，适合嵌入式系统。
-- **命令注册**：支持动态注册用户自定义命令及帮助信息。
-- **参数解析**：自动解析命令参数，最大支持 `LWCLI_COMMAND_STR_MAX_LENGTH` 字节的命令长度。
-- **历史记录**：支持最多 `LWCLI_HISTORY_COMMAND_NUM` 条命令历史记录，占用约 `LWCLI_HISTORY_COMMAND_NUM * LWCLI_RECEIVE_BUFFER_SIZE` 字节内存。
-- **光标编辑**: 支持左右方向键移动光标，实现命令行编辑（插入、删除字符）。
-- **文件系统支持**: 当启用 LWCLI_WITH_FILE_SYSTEM 时，提示符可显示用户名和当前路径（如 Linux shell），路径由用户在 lwcli_port.c 中实现。
-- **跨平台**：通过硬件抽象层 (`lwcli_port.c`) 支持不同硬件平台的串口/USB 接口。
-- **FreeRTOS 集成**：提供任务创建和处理功能，易于嵌入式多任务环境。
-- **错误提示**：内置帮助命令和未识别命令提示。
+- **轻量级设计**：占用资源少，适合嵌入式系统
+- **动态命令注册**：支持注册命令、简要帮助、**用法（usage）** 和 **详细说明（description）**
+- **Tab 自动补全**：支持命令名前缀补全，Tab 显示匹配列表
+- **参数解析**：自动分割参数，支持引号包裹参数（支持最多 `LWCLI_RECEIVE_BUFFER_SIZE` 长度）
+- **命令历史记录**：支持最多 `LWCLI_HISTORY_COMMAND_NUM` 条记录，使用上下箭头键浏览
+- **光标编辑**：支持左右方向键移动光标、Backspace/Delete 删除字符
+- **文件系统风格提示符**：启用 `LWCLI_WITH_FILE_SYSTEM` 后显示用户名:路径 $ （类似 Linux shell）
+- **跨平台**：通过 `lwcli_port.c` 硬件抽象层适配不同 MCU/串口/USB
+- **FreeRTOS 集成**：提供独立任务处理输入输出
+- **增强的帮助系统**：支持 `help` 列出所有命令、`help <cmd>` 查看详细用法和说明
 
 ## 快速开始
 
 ### 依赖
 
 - **编译环境**：C 编译器 (如 GCC)
-- **操作系统**：FreeRTOS (用于任务管理)
+- **操作系统**：支持操作系统（例如FReeRTOS）或裸机
 - **硬件**：支持串口或 USB 的硬件平台
 - **库**：标准 C 库 (`stdlib.h`, `stdio.h`, `string.h`)
 
@@ -44,64 +47,20 @@
    ```
 
 2. 配置硬件接口：
-    - 编辑 `lwcli_port.c` 中的接口函数 (`lwcli_malloc`, `lwcli_free`, `lwcli_hardware_init`, `lwcli_output_char`, `lwcli_output`, `lwcli_receive`)，适配目标硬件平台。
-    - 确保依赖的硬件驱动 (`usart_drv.h`, `mydebug.h`, `malloc.h`) 已正确配置。
+    - 编辑 `lwcli_port.c` 中的接口函数 (`lwcli_malloc`, `lwcli_free`, `lwcli_hardware_init`, `lwcli_output`)，适配目标硬件平台。
 
 3. 编译项目：
-    - 将 `lwcli.c`, `lwcli_task.c`, `lwcli_port.c`, `lwcli.h`, `lwcli_config.h`, `main.c` 加入您的嵌入式项目。
-    - 配置 FreeRTOS 环境，设置任务堆栈大小和优先级。
+    - 将 `lwcli.c`, `lwcli_port.c`, `lwcli.h`, `lwcli_config.h` 加入您的嵌入式项目。
 
-4. 启动任务：
-    - 调用 `lwcli_task_start(StackDepth, uxPriority)` 创建 lwcli 任务。
-    - 示例：
-      ```c
-      lwcli_task_start(512, 4); // 堆栈大小 512 字节，优先级 4
-      ```
 
 ### 使用示例
 
-`main.c` 提供了一个示例，展示如何初始化 lwcli 并注册命令。**注意**：该文件仅用于演示接口使用，无法直接运行，需结合具体硬件平台实现。
+`lwcli/example/linux/main.c` 提供了一个裸机示例，展示如何初始化 lwcli、注册命令和调用处理接口
 
-#### 示例代码
-```c
-#include "lwcli.h"
+`lwcli/example/FReeRTOS/main.c` 提供了一个FreeRTOS示例，展示如何初始化 lwcli、注册命令和调用处理接口
 
-void test_command_callback(char **args, uint8_t arge_num) {
-    for (int i = 0; i < arge_num; i++) {
-        printf("%s ", args[i]); // 打印所有参数
-    }
-    printf("\r\n");
-}
+`lwcli/example/linux/` 中提供了编译并运行的脚本 `build_run.sh` 可以在Linux环境下中直接运行示例
 
-void lwcli_init(void) {
-    lwcli_task_start(512, 4); // 启动 lwcli 任务
-    lwcli_regist_command("test", "help string of test command", test_command_callback); // 注册 test 命令
-}
-
-int main(void) {
-    lwcli_init();
-    vTaskStartScheduler();
-    while (1) {
-        /* never run to here */
-    }
-    return 0;
-}
-```
-
-#### 运行效果
-- 启动后，lwcli 输出欢迎信息：
-  ```
-  lwcli start, nType Help to view a list of registered commands
-  ```
-- 输入 `help` 查看已注册命令列表：
-  ```
-  test:    help string of test command
-  ```
-- 输入 `test 123 456 -789` 执行自定义命令，输出：
-  ```
-  123 456 -789
-  ```
-- 使用上下箭头键 (若启用历史记录) 浏览历史命令。
 
 #### 命令历史记录
 - 支持最多 10 条命令历史记录。
@@ -134,13 +93,13 @@ int main(void) {
 lwcli/
 ├── src/                # 移植所需源文件
 │   ├── lwcli.c         # 核心命令解析逻辑
-│   ├── lwcli_task.c    # FreeRTOS 任务实现
 │   └── lwcli_port.c    # 硬件抽象层（需用户实现）
 ├── inc/                # 移植所需头文件
 │   ├── lwcli.h         # 用户接口头文件
 │   └── lwcli_config.h  # 配置参数头文件
 ├── example/            # 使用示例
-│   └── main.c          # 示例代码（仅演示接口，无法直接运行）
+|   ├──linux            # Linux示例代码
+│   └──FReeRTOS         # FreeRTOS示例代码
 ├── LICENSE             # MIT 许可证
 ├── README.md           # 中文文档
 └── README_EN.md        # 英文文档

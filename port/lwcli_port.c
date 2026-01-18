@@ -2,7 +2,7 @@
  * @file lwcli_port.c
  * @author GYM (48060945@qq.com)
  * @brief lwcli 对外接口实现
- * @version V0.0.3
+ * @version V0.0.4
  * @date 2025-10-19
  * 
  * @copyright Copyright (c) 2025
@@ -17,57 +17,54 @@
 #include "stdio.h"
 
 /**
- * @brief 内存申请函数
- * @param size 申请的内存大小
- * @return 申请的内存指针
+ * @brief Memory allocation function
+ * @param size  Size of memory to allocate
+ * @return      Pointer to the allocated memory, or NULL on failure
  */
 void *lwcli_malloc(size_t size)
 {
-    /* add your malloc funcion here */
-    return malloc( size );
+    /* add your malloc function here */
+    return malloc(size);
 }
 
 /**
- * @brief 内存释放函数
- * @param[in] ptr 释放的内存指针
+ * @brief Memory free function
+ * @param[in] ptr  Pointer to the memory block to free
  */
 void lwcli_free(void *ptr)
 {
-    /* add your free funcion here */
+    /* add your free function here */
     free(ptr);
 }
 
 /**
- * @brief 硬件初始化函数
- * @note 串口/USB 初始化 
+ * @brief Hardware initialization function
+ * @note Initialize UART/serial, USB, or other I/O interfaces used by lwcli
  */
 void lwcli_hardware_init(void)
 {
     /* add your hardware init function here */
 }
 
-
 /**
- * @brief 字符串输出函数
- * @param output_string 输出的字符串
- * @param string_len 字符串长度
+ * @brief Output string to terminal
+ * @param output_string  String to output
+ * @param string_len     Length of the string
  */
 void lwcli_output(const char *output_string, uint16_t string_len)
 {
     /* add your output function here */
-    if (string_len == 1){
+    if (string_len == 1) {
         putchar(*output_string);
-    }
-    else{
+    } else {
         printf("%s", output_string);
     }
 }
 
-
 #if (LWCLI_WITH_FILE_SYSTEM == true)
 /**
- * @brief 获取当前文件系统路径
- * @return 当前文件路径
+ * @brief Get current filesystem path
+ * @return Current path string (must be null-terminated)
  */
 char *lwcli_get_file_path(void)
 {

@@ -2,7 +2,7 @@
  * @file lwcli.c
  * @author GYM (48060945@qq.com)
  * @brief lwcli 核心函数实现文件
- * @version V0.0.3
+ * @version V0.0.4
  * @date 2025-10-19
  * 
  * @copyright Copyright (c) 2025
@@ -25,11 +25,11 @@ typedef struct
 
 typedef struct cmdList
 {
-    char cmdStr[LWCLI_COMMAND_STR_MAX_LENGTH];
-    char helpStr[LWCLI_HELP_STR_MAX_LENGTH];
+    char command[LWCLI_COMMAND_STR_MAX_LENGTH];
+    char brief[LWCLI_HELP_STR_MAX_LENGTH];
     help_details_t help_detail;
-    uint8_t cmdLen;
-    user_callback_f callBack;
+    uint8_t cmd_len;
+    user_callback_f callback;
     struct cmdList *next;
 }cmdList_t;
 
@@ -108,7 +108,7 @@ static void lwcli_help(int argc, char* argv[]);
 static void lwcli_clear(int argc, char* argv[]);
 static uint8_t lwcli_find_parameters(const char *argv_str, char **parameter_arry, uint8_t parameter_num);
 static uint8_t lwcli_get_parameter_number(const char *command_string);
-static void lwcli_process_command(char *cmdStr);
+static void lwcli_process_command(char *command);
 static void lwcli_printf(const char *format, ...);
 static void lwcli_table_func(void);
 
@@ -166,8 +166,7 @@ void lwcli_software_init(void)
 {
     /** 初始化头节点并绑定帮助命令 */
     lwcliObj.cmdListHead = (cmdList_t *)lwcli_malloc(sizeof(cmdList_t));
-    if (lwcliObj.cmdListHead == NULL)
-    {
+    if (lwcliObj.cmdListHead == NULL) {
         lwcli_printf("lwcli malloc error\r\n");
         return;
     }
@@ -207,47 +206,42 @@ void lwcli_software_init(void)
 
 /**
  * @brief 注册命令
- * @param cmdStr 命令字符串
- * @param helpStr 帮助字符串
- * @param userCallback 用户回调函数
+ * @param command 命令字符串
+ * @param brief 帮助字符串
+ * @param user_callback 用户回调函数
  * @return 命令描述符 command_fd
  */
-int lwcli_regist_command(const char *cmdStr, const char *helpStr, user_callback_f userCallback)
+int lwcli_regist_command(const char *command, const char *brief, user_callback_f user_callback)
 {
-    lwcli_assert_return(cmdStr != NULL, -1);
-    lwcli_assert_return(helpStr != NULL, -1);
-    lwcli_assert_return(userCallback != NULL, -1);
-    if (strlen(cmdStr) > LWCLI_COMMAND_STR_MAX_LENGTH)
-    {
+    lwcli_assert_return(command != NULL, -1);
+    lwcli_assert_return(brief != NULL, -1);
+    lwcli_assert_return(user_callback != NULL, -1);
+    if (strlen(command) > LWCLI_COMMAND_STR_MAX_LENGTH) {
         lwcli_printf("command string too long please modify LWCLI_COMMAND_STR_MAX_LENGTH \r\n");
         return -1;
     }
-    if (strlen(helpStr) > LWCLI_HELP_STR_MAX_LENGTH)
-    {
+    if (strlen(brief) > LWCLI_HELP_STR_MAX_LENGTH) {
         lwcli_printf("help string too long please modify LWCLI_HELP_STR_MAX_LENGTH \r\n");
         return -1;
     }
-    if (lwcliObj.cmdListHead == NULL)
-    {
+    if (lwcliObj.cmdListHead == NULL) {
         lwcli_printf("%s%s%s\r\n", colorTable[COLOR_RED], "please call lwcli_software_init before regist command", LWCLI_ANSI_COLOR_RESET);
         return -1;
     }
     cmdList_t *newNode = (cmdList_t *) lwcli_malloc(sizeof(cmdList_t));
     cmdList_t *pnode = lwcliObj.cmdListHead;
-    if (newNode == NULL)
-    {
+    if (newNode == NULL) {
         lwcli_printf("lwcli malloc error\r\n");
         return -1;
     }
-    newNode->cmdLen = strlen(cmdStr);
-    memcpy(newNode->cmdStr, cmdStr, newNode->cmdLen);
-    newNode->cmdStr[newNode->cmdLen] = '\0';
-    memcpy(newNode->helpStr, helpStr, strlen(helpStr));
-    newNode->helpStr[strlen(helpStr)] = '\0';
-    newNode->callBack = userCallback;
+    newNode->cmd_len = strlen(command);
+    memcpy(newNode->command, command, newNode->cmd_len);
+    newNode->command[newNode->cmd_len] = '\0';
+    memcpy(newNode->brief, brief, strlen(brief));
+    newNode->brief[strlen(brief)] = '\0';
+    newNode->callback = user_callback;
     newNode->next = NULL;
-    while (pnode->next)
-    {
+    while (pnode->next) {
         pnode = pnode->next;
     }
     pnode->next = newNode;
@@ -296,15 +290,15 @@ static void lwcli_help(int argc, char* argv[])
     memset(lwcliObj.ouputBuffer, 0, sizeof(lwcliObj.ouputBuffer));
     if (argc == 0){
         while(node) {
-            if (node->helpStr[0] != '\0') {
-                memcpy(lwcliObj.ouputBuffer, node->cmdStr, node->cmdLen);
-                output_len = node->cmdLen;
+            if (node->brief[0] != '\0') {
+                memcpy(lwcliObj.ouputBuffer, node->command, node->cmd_len);
+                output_len = node->cmd_len;
                 lwcliObj.ouputBuffer[output_len++] = ':';
-                for (uint16_t i = 0; i < (LWCLI_COMMAND_STR_MAX_LENGTH + 3 - (node->cmdLen + 1) + 4); i++) {
+                for (uint16_t i = 0; i < (LWCLI_COMMAND_STR_MAX_LENGTH + 3 - (node->cmd_len + 1) + 4); i++) {
                     lwcliObj.ouputBuffer[output_len++] = ' ';
                 }
-                uint16_t helpStrLen = strlen(node->helpStr);
-                memcpy(lwcliObj.ouputBuffer + output_len, node->helpStr, helpStrLen);
+                uint16_t helpStrLen = strlen(node->brief);
+                memcpy(lwcliObj.ouputBuffer + output_len, node->brief, helpStrLen);
                 output_len += helpStrLen;
                 lwcliObj.ouputBuffer[output_len++] = '\r';
                 lwcliObj.ouputBuffer[output_len++] = '\n';
@@ -319,13 +313,13 @@ static void lwcli_help(int argc, char* argv[])
     else {
         uint16_t command_len = strlen(argv[0]);
         while(node){
-            if (strncmp(node->cmdStr, argv[0], (command_len > node->cmdLen) ? node->cmdLen : command_len) == 0) {
-                memcpy(lwcliObj.ouputBuffer, node->cmdStr, node->cmdLen);
-                output_len = node->cmdLen;
+            if (strncmp(node->command, argv[0], (command_len > node->cmd_len) ? node->cmd_len : command_len) == 0) {
+                memcpy(lwcliObj.ouputBuffer, node->command, node->cmd_len);
+                output_len = node->cmd_len;
                 lwcliObj.ouputBuffer[output_len++] = ' ';
                 lwcliObj.ouputBuffer[output_len++] = ' ';
-                uint16_t str_len = strlen(node->helpStr);
-                strcpy(lwcliObj.ouputBuffer + output_len, node->helpStr);
+                uint16_t str_len = strlen(node->brief);
+                strcpy(lwcliObj.ouputBuffer + output_len, node->brief);
                 output_len += str_len;
                 lwcliObj.ouputBuffer[output_len++] = '\r';
                 lwcliObj.ouputBuffer[output_len++] = '\n';
@@ -381,13 +375,12 @@ static void lwcli_printf(const char *format, ...)
 
 /**
  * @brief 接收处理字符
- * @param revChar 接收到的字符
+ * @param recv_char 接收到的字符
  */
-void lwcli_process_receive_char(char revChar)
+void lwcli_process_receive_char(char recv_char)
 {
     static uint8_t ansiKey = 0;
-    if (revChar == '\r' || revChar == '\n')
-    {
+    if (recv_char == '\r' || recv_char == '\n') {
         lwcliObj.inputBuffer[lwcliObj.inputBufferPos] = '\0';
         lwcli_output("\r\n", 2);
         lwcli_process_command(lwcliObj.inputBuffer);
@@ -400,20 +393,16 @@ void lwcli_process_receive_char(char revChar)
         lwcliObj.inputBufferPos = 0;
         lwcliObj.cursorPos = 0;
     }
-    else if ((revChar == '\b' || revChar == ansi_delete))
-    {
-        if (lwcliObj.inputBufferPos == 0)
-        {
+    else if ((recv_char == '\b' || recv_char == ansi_delete)) {
+        if (lwcliObj.inputBufferPos == 0) {
             return;
         }
-        if (lwcliObj.cursorPos == lwcliObj.inputBufferPos)
-        {
+        if (lwcliObj.cursorPos == lwcliObj.inputBufferPos) {
             lwcliObj.inputBuffer[--lwcliObj.inputBufferPos] = '\0';
             lwcli_printf(lwcli_delete);
             lwcliObj.cursorPos = lwcliObj.inputBufferPos;
         }
-        else if (lwcliObj.cursorPos > 0)
-        {
+        else if (lwcliObj.cursorPos > 0) {
             for (size_t i = lwcliObj.cursorPos - 1; i < lwcliObj.inputBufferPos; i++) // 字符串缓存处理，保证cmdStrBuffer中存储的字符串和屏幕一致
             {
                 lwcliObj.inputBuffer[i] = lwcliObj.inputBuffer[i + 1];
@@ -423,68 +412,53 @@ void lwcli_process_receive_char(char revChar)
             lwcliObj.cursorPos--;
         }
     }
-    else if (revChar == '\t')
-    {
+    else if (recv_char == '\t') {
         lwcli_table_func();
     }
-    else if (revChar == '\033')
-    {
+    else if (recv_char == '\033') {
         ansiKey = 1;
     }
-    else
-    {
-        if (ansiKey == 0)
-        {
+    else {
+        if (ansiKey == 0) {
             lwcli_assert(lwcliObj.inputBufferPos < sizeof(lwcliObj.inputBuffer) - 1);
-            if (lwcliObj.cursorPos == lwcliObj.inputBufferPos)  // 普通字符且光标处于最后
-            {
-                lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = revChar;
+            if (lwcliObj.cursorPos == lwcliObj.inputBufferPos) { // 普通字符且光标处于最后
+                lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = recv_char;
                 lwcliObj.cursorPos = lwcliObj.inputBufferPos;
-                lwcli_output(&revChar, 1);
+                lwcli_output(&recv_char, 1);
             }
-            else    // 普通字符但光标不是在最后
-            {
-                lwcli_printf("%c%s%s%s", revChar, ansi_cursor_save, lwcliObj.inputBuffer + lwcliObj.cursorPos, ansi_cursor_restore);
+            else {   // 普通字符但光标不是在最后
+                lwcli_printf("%c%s%s%s", recv_char, ansi_cursor_save, lwcliObj.inputBuffer + lwcliObj.cursorPos, ansi_cursor_restore);
                 
-                for (size_t i = lwcliObj.inputBufferPos; i > lwcliObj.cursorPos; i--) // 字符串缓存处理，保证cmdStrBuffer中存储的字符串和屏幕一致
-                {
+                for (size_t i = lwcliObj.inputBufferPos; i > lwcliObj.cursorPos; i--) {// 字符串缓存处理，保证cmdStrBuffer中存储的字符串和屏幕一致
                     lwcliObj.inputBuffer[i] = lwcliObj.inputBuffer[i - 1];
                 }
-                lwcliObj.inputBuffer[lwcliObj.cursorPos] = revChar;
+                lwcliObj.inputBuffer[lwcliObj.cursorPos] = recv_char;
                 lwcliObj.inputBufferPos++;
                 lwcliObj.cursorPos++;
             }
         }
-        else if (ansiKey == 1)
-        {
+        else if (ansiKey == 1) {
             ansiKey++;
         }
-        else if (ansiKey == 2)
-        {
+        else if (ansiKey == 2) {
             ansiKey = 0;
-            if (revChar == 'C')
-            {
-                if (lwcliObj.cursorPos < lwcliObj.inputBufferPos)
-                {
+            if (recv_char == 'C') {
+                if (lwcliObj.cursorPos < lwcliObj.inputBufferPos) {
                     lwcliObj.cursorPos++;
                     lwcli_output(ansi_cursor_right, sizeof(ansi_cursor_right));
                 }
             }
-            else if (revChar == 'D')
-            {
-                if (lwcliObj.cursorPos > 0)
-                {
+            else if (recv_char == 'D') {
+                if (lwcliObj.cursorPos > 0) {
                     lwcliObj.cursorPos--;
                     lwcli_output(ansi_cursor_left, sizeof(ansi_cursor_left));
                 }
             }
             #if (LWCLI_HISTORY_COMMAND_NUM > 0)
-            else if (revChar == 'A')
-            {
+            else if (recv_char == 'A') {
                 lwcli_history_command_up();
             }
-            else if (revChar == 'B')
-            {
+            else if (recv_char == 'B') {
                 lwcli_history_command_down();
             }
             #endif // LWCLI_HISTORY_COMMAND_NUM > 0
@@ -511,39 +485,33 @@ static uint8_t lwcli_match_command(const char *inputStr, const char *expected_co
 
 /**
  * @brief 命令处理
- * @param cmdStr 命令字符串
+ * @param command 命令字符串
  */
-static void lwcli_process_command(char *cmdStr)
+static void lwcli_process_command(char *command)
 {
     cmdList_t *node = lwcliObj.cmdListHead;
     char *cmdParameter = NULL;
-    while (node)
-    {
-        if (lwcli_match_command(cmdStr, node->cmdStr))
-        {
-            cmdParameter = cmdStr;
+    while (node) {
+        if (lwcli_match_command(command, node->command)) {
+            cmdParameter = command;
             // 寻找参数
             uint8_t parameter_num = lwcli_get_parameter_number(cmdParameter);
-            if (parameter_num == 0)
-            {
-                node->callBack(0, NULL);
+            if (parameter_num == 0) {
+                node->callback(0, NULL);
                 #if (LWCLI_WITH_FILE_SYSTEM == true)
                 lwcli_output_file_path();
                 #endif  // LWCLI_WITH_FILE_SYSTEM == true
                 return;
             }
-            else
-            {
+            else {
                 char **parameterArray = (char **) lwcli_malloc(sizeof(char *) * parameter_num);
-                if (parameterArray == NULL)
-                {
+                if (parameterArray == NULL) {
                     lwcli_printf("error malloc\r\n");
                     return;
                 }
-                uint8_t findParameterNum = lwcli_find_parameters(cmdParameter + node->cmdLen, parameterArray, parameter_num);
-                node->callBack(findParameterNum, parameterArray);
-                for (int i = 0; i < findParameterNum; ++i)
-                {
+                uint8_t findParameterNum = lwcli_find_parameters(cmdParameter + node->cmd_len, parameterArray, parameter_num);
+                node->callback(findParameterNum, parameterArray);
+                for (int i = 0; i < findParameterNum; ++i) {
                     lwcli_free(parameterArray[i]);
                 }
                 lwcli_free(parameterArray);
@@ -556,7 +524,7 @@ static void lwcli_process_command(char *cmdStr)
         node = node->next;
     }
 
-    lwcli_printf(lwcli_reminder, cmdStr);
+    lwcli_printf(lwcli_reminder, command);
 #if (LWCLI_WITH_FILE_SYSTEM == true)
     lwcli_output_file_path();
 #endif // LWCLI_WITH_FILE_SYSTEM == true
@@ -573,20 +541,16 @@ static uint8_t lwcli_get_parameter_number(const char *command_string)
     uint8_t len = strlen(command_string);
     bool in_quotes = false; // 是否处于引号中
     uint8_t parameter_num = 0, quotes_num = 0;
-    for (uint8_t i = 0; i < len - 1; i++)
-    {
-        if (command_string[i] == ' ' && command_string[i + 1] != ' ' && !in_quotes)
-        {
+    for (uint8_t i = 0; i < len - 1; i++) {
+        if (command_string[i] == ' ' && command_string[i + 1] != ' ' && !in_quotes) {
             parameter_num++;
         }
-        else if (command_string[i] == '\"') // 引号
-        {
+        else if (command_string[i] == '\"') {// 引号
             quotes_num++;
             in_quotes = !in_quotes;
         }
     }
-    if (command_string[len - 1] == '\"')
-    {
+    if (command_string[len - 1] == '\"') {
         quotes_num++;
     }
     parameter_num = (quotes_num % 2 == 0) ? parameter_num : 0; // 奇数个引号则参数无效
@@ -606,41 +570,34 @@ static uint8_t lwcli_find_parameters(const char *argv_str, char **parameter_arry
     bool in_quotes = false; // 是否处于引号中
 
     uint8_t *index = (uint8_t*) lwcli_malloc(sizeof(uint8_t) * (parameter_num + 1));  // 增加一个元素用于最后一个参数
-    if (index == NULL)
-    {
+    if (index == NULL) {
         lwcli_printf("error malloc\r\n");
         return 0;
     }
 
     // 找到参数位置
-    for (uint8_t i = 0; i < len - 1; i++)
-    {
-        if (argv_str[i] == ' ' && argv_str[i + 1] != ' ' && !in_quotes)
-        {
+    for (uint8_t i = 0; i < len - 1; i++) {
+        if (argv_str[i] == ' ' && argv_str[i + 1] != ' ' && !in_quotes) {
             index[found_num++] = i + 1;
             if (found_num == parameter_num)
                 break;
         }
-        else if (argv_str[i] == '\"')
-        {
+        else if (argv_str[i] == '\"') {
             in_quotes = !in_quotes;
         }
     }
 
     // 提取处理参数
-    for (uint8_t i = 0; i < found_num; i++)
-    {
+    for (uint8_t i = 0; i < found_num; i++) {
         uint8_t start = index[i];
         uint8_t end = 0;
         end = (i + 1 < found_num) ? index[i + 1] - 1: len;  // 确保最后一个参数处理正确
         uint8_t param_len = end - start;
 
         parameter_arry[i] = (char *)lwcli_malloc(param_len + 1);  // 分配内存
-        if (parameter_arry[i] == NULL)//错误处理
-        {
+        if (parameter_arry[i] == NULL) { //错误处理
             lwcli_printf("error malloc\r\n");
-            for (uint8_t j = 0; j < i; j++)
-            {
+            for (uint8_t j = 0; j < i; j++) {
                 lwcli_free(parameter_arry[j]);
             }
             lwcli_free(index);
@@ -668,7 +625,7 @@ int lwcli_longest_common_prefix_length(int argc, char *argv[])
     const char *base = argv[0];
     size_t len = 0;
 
-    while (*base) {                     // 只要基准字符串没结束
+    while (*base) { // 只要基准字符串没结束
         for (int i = 1; i < argc; i++) {
             if (!argv[i][len] || argv[i][len] != *base) {
                 return (int)len;
@@ -690,15 +647,12 @@ static void lwcli_table_func(void)
     const char *prefix = lwcliObj.inputBuffer;
     cmdList_t *node = lwcliObj.cmdListHead;
     uint16_t match_num = 0;
-    if (!lwcliObj.inputBufferPos)
-    {
+    if (!lwcliObj.inputBufferPos) {
         return;
     }
-    while (node) 
-    {
-        if (lwcliObj.inputBufferPos < node->cmdLen)
-        {
-            if (strncmp(node->cmdStr, prefix, lwcliObj.inputBufferPos) == 0) 
+    while (node) {
+        if (lwcliObj.inputBufferPos < node->cmd_len) {
+            if (strncmp(node->command, prefix, lwcliObj.inputBufferPos) == 0) 
             {
                 match_num++;
             }
@@ -707,8 +661,7 @@ static void lwcli_table_func(void)
     }
 
     node = lwcliObj.cmdListHead;
-    if (match_num == 0)
-    {
+    if (match_num == 0) {
         #if (LWCLI_WITH_FILE_SYSTEM == true)
         lwcli_output("\r\n", 2);
         lwcli_output_file_path();
@@ -718,16 +671,12 @@ static void lwcli_table_func(void)
         lwcli_output(lwcliObj.ouputBuffer, output_len);
         #endif // LWCLI_WITH_FILE_SYSTEM == true
     }
-    else if (match_num == 1)
-    {
-        while (node) 
-        {
-            if (lwcliObj.inputBufferPos < node->cmdLen)
-            {
-                if (strncmp(node->cmdStr, prefix, lwcliObj.inputBufferPos) == 0) 
-                {
-                    memcpy(lwcliObj.inputBuffer, node->cmdStr, node->cmdLen);
-                    lwcliObj.inputBufferPos = node->cmdLen;
+    else if (match_num == 1) {
+        while (node) {
+            if (lwcliObj.inputBufferPos < node->cmd_len) {
+                if (strncmp(node->command, prefix, lwcliObj.inputBufferPos) == 0) {
+                    memcpy(lwcliObj.inputBuffer, node->command, node->cmd_len);
+                    lwcliObj.inputBufferPos = node->cmd_len;
                     lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = ' ';
                     lwcliObj.cursorPos = lwcliObj.inputBufferPos;
                     lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
@@ -749,25 +698,21 @@ static void lwcli_table_func(void)
             return;
         }
 
-        while (node) 
-        {
-            if (strncmp(node->cmdStr, prefix, lwcliObj.inputBufferPos) == 0) 
-            {
-                match_arr[match_index++] = node->cmdStr;
+        while (node) {
+            if (strncmp(node->command, prefix, lwcliObj.inputBufferPos) == 0) {
+                match_arr[match_index++] = node->command;
             }
             node = node->next;
         }
 
         uint16_t match_max_len = lwcli_longest_common_prefix_length(match_num, match_arr);
         lwcli_output("\r\n", 2);
-        for (uint16_t i = 0; i < match_num; i++)
-        {
+        for (uint16_t i = 0; i < match_num; i++) {
             lwcli_output(match_arr[i], strlen(match_arr[i]));
             lwcli_output("     ", 5);
         }
         
-        while (lwcliObj.inputBufferPos < match_max_len)
-        {
+        while (lwcliObj.inputBufferPos < match_max_len) {
             lwcliObj.inputBuffer[lwcliObj.inputBufferPos] = match_arr[0][lwcliObj.inputBufferPos];
             lwcliObj.inputBufferPos++;
         }
@@ -813,8 +758,7 @@ static bool lwcli_history_is_empty()
  */
 static void lwcli_add_history_command(void)
 {
-    if (lwcli_history_is_full())
-    {
+    if (lwcli_history_is_full()) {
         HISTORY_UPDATE_READ_INDEX();
     }
     memcpy(lwcliObj.historyList.buffer + (lwcliObj.historyList.writePos * lwcliObj.historyList.commandStrSize), lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
@@ -822,20 +766,16 @@ static void lwcli_add_history_command(void)
     HISTORY_UPDATE_WRITE_INDEX();
     lwcliObj.historyList.findPos = lwcliObj.historyList.writePos;
 
-    if (lwcli_history_is_full())
-    {
+    if (lwcli_history_is_full()) {
         uint16_t readPosTemp = lwcliObj.historyList.readPos;
-        for (uint16_t i = 0; i < LWCLI_HISTORY_COMMAND_NUM; i++)
-        {
+        for (uint16_t i = 0; i < LWCLI_HISTORY_COMMAND_NUM; i++) {
             lwcliObj.historyList.findPosIndex[i] = readPosTemp;
             readPosTemp = (readPosTemp + 1) % lwcliObj.historyList.recordHistoryNum;
         }
         lwcliObj.historyList.findPos = LWCLI_HISTORY_COMMAND_NUM;
     }
-    else
-    {
-        for (uint16_t i = 0; i < lwcliObj.historyList.writePos; i++)
-        {
+    else {
+        for (uint16_t i = 0; i < lwcliObj.historyList.writePos; i++) {
             lwcliObj.historyList.findPosIndex[i] = i;
         }
         lwcliObj.historyList.findPos = lwcliObj.historyList.writePos;
@@ -846,27 +786,24 @@ static void lwcli_add_history_command(void)
 
 /**
  * @brief 读取上一条历史命令
- * @param cmdStr 读取到的命令字符串
+ * @param command 读取到的命令字符串
  */
 static void lwcli_history_command_up(void)
 {
     uint16_t historyCmdPos = lwcliObj.historyList.findPosIndex[0]; 
 
-    if (lwcli_history_is_empty())
-    {
+    if (lwcli_history_is_empty()) {
         return;
     }
 
-    if (lwcliObj.historyList.findPos > 0)
-    {
+    if (lwcliObj.historyList.findPos > 0) {
         lwcliObj.historyList.findPos --;
         historyCmdPos = lwcliObj.historyList.findPosIndex[lwcliObj.historyList.findPos];
     }
 
     uint8_t historyCommandLen = 0;
     char cmdChar = lwcliObj.historyList.buffer[historyCmdPos * lwcliObj.historyList.commandStrSize];
-    while (cmdChar != '\0' && historyCommandLen < lwcliObj.historyList.commandStrSize)
-    {
+    while (cmdChar != '\0' && historyCommandLen < lwcliObj.historyList.commandStrSize) {
         historyCommandLen++;
         cmdChar = lwcliObj.historyList.buffer[historyCmdPos * lwcliObj.historyList.commandStrSize + historyCommandLen];
     }
@@ -889,15 +826,12 @@ static void lwcli_history_command_down(void)
 {
     uint16_t historyCmdPos = lwcliObj.historyList.findPosIndex[0]; 
 
-    if (lwcli_history_is_empty())
-    {
+    if (lwcli_history_is_empty()) {
         return;
     }
 
-    if (lwcli_history_is_full())
-    {
-        if (lwcliObj.historyList.findPos >= LWCLI_HISTORY_COMMAND_NUM - 1) // 还没有使用UP键，则不允许使用Down 或者 Down到最后一个了
-        {
+    if (lwcli_history_is_full()) {
+        if (lwcliObj.historyList.findPos >= LWCLI_HISTORY_COMMAND_NUM - 1) { // 还没有使用UP键，则不允许使用Down 或者 Down到最后一个了
             lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
             #if (LWCLI_WITH_FILE_SYSTEM == true)
             lwcli_output_file_path();
@@ -907,19 +841,15 @@ static void lwcli_history_command_down(void)
             lwcliObj.cursorPos = 0;
             return;
         }
-        else
-        {
-            if (lwcliObj.historyList.findPos < LWCLI_HISTORY_COMMAND_NUM - 1)
-            {
+        else {
+            if (lwcliObj.historyList.findPos < LWCLI_HISTORY_COMMAND_NUM - 1) {
                 lwcliObj.historyList.findPos++;
                 historyCmdPos = lwcliObj.historyList.findPosIndex[lwcliObj.historyList.findPos];
             }
         }
     }
-    else
-    {
-        if (lwcliObj.historyList.findPos >= lwcliObj.historyList.writePos - 1)   // 还没有使用UP键，则不允许使用Down 或者 Down到最后一个了
-        {
+    else {
+        if (lwcliObj.historyList.findPos >= lwcliObj.historyList.writePos - 1){  // 还没有使用UP键，则不允许使用Down 或者 Down到最后一个了
             lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
             #if (LWCLI_WITH_FILE_SYSTEM == true)
             lwcli_output_file_path();
@@ -929,10 +859,8 @@ static void lwcli_history_command_down(void)
             lwcliObj.cursorPos = 0;
             return;
         }
-        else
-        {
-            if (lwcliObj.historyList.findPos < lwcliObj.historyList.writePos)
-            {
+        else {
+            if (lwcliObj.historyList.findPos < lwcliObj.historyList.writePos) {
                 lwcliObj.historyList.findPos++;
             }
             historyCmdPos = lwcliObj.historyList.findPosIndex[lwcliObj.historyList.findPos];
@@ -940,8 +868,7 @@ static void lwcli_history_command_down(void)
     }
     uint8_t historyCommandLen = 0;
     char cmdChar = lwcliObj.historyList.buffer[historyCmdPos * lwcliObj.historyList.commandStrSize];
-    while (cmdChar != '\0' && historyCommandLen < lwcliObj.historyList.commandStrSize)
-    {
+    while (cmdChar != '\0' && historyCommandLen < lwcliObj.historyList.commandStrSize) {
         historyCommandLen++;
         cmdChar = lwcliObj.historyList.buffer[historyCmdPos * lwcliObj.historyList.commandStrSize + historyCommandLen];
     }

@@ -12,17 +12,22 @@
 
 **lwcli** is a lightweight command-line interface (CLI) component designed for embedded systems, enabling efficient command parsing and processing. It supports dynamic command registration, parameter parsing, and command history, making it suitable for various hardware interfaces such as serial ports or USB. Built in C and integrated with FreeRTOS for task management, lwcli is ideal for resource-constrained embedded environments.
 
-Current version: `V0.0.1`
+Current version: `V0.0.4`
+
+![example](/example.gif)
 
 ## Features
 
-- **Lightweight Design**: Minimal resource usage, tailored for embedded systems.
-- **Command Registration**: Supports dynamic registration of user-defined commands with help messages.
-- **Parameter Parsing**: Automatically parses command parameters, supporting up to `LWCLI_COMMAND_STR_MAX_LENGTH` bytes for command names.
-- **Command History**: Stores up to `LWCLI_HISTORY_COMMAND_NUM` command history entries, using approximately `LWCLI_HISTORY_COMMAND_NUM * LWCLI_RECEIVE_BUFFER_SIZE` bytes of memory.
-- **Cross-Platform**: Hardware abstraction layer (`lwcli_port.c`) supports various hardware platforms with serial/USB interfaces.
-- **FreeRTOS Integration**: Provides task creation and processing for seamless integration in multi-tasking embedded environments.
-- **Error Handling**: Includes built-in help command and unrecognized command prompts.
+- **Lightweight design**: Minimal resource usage, ideal for embedded systems
+- **Dynamic command registration**: Register commands along with brief help, **usage**, and **detailed description**
+- **Tab auto-completion**: Supports command prefix completion; press Tab to show matching suggestions
+- **Parameter parsing**: Automatically splits parameters, supports quoted arguments (up to `LWCLI_RECEIVE_BUFFER_SIZE` length)
+- **Command history**: Supports up to `LWCLI_HISTORY_COMMAND_NUM` entries; navigate with up/down arrow keys
+- **Cursor editing**: Supports left/right arrow keys for cursor movement, Backspace/Delete for character removal
+- **File-system-style prompt**: When `LWCLI_WITH_FILE_SYSTEM` is enabled, displays `username:path $` (similar to Linux shell)
+- **Cross-platform**: Hardware abstraction layer in `lwcli_port.c` adapts to different MCUs, serial, or USB
+- **FreeRTOS integration**: Provides a dedicated task for input/output handling
+- **Enhanced help system**: `help` lists all commands; `help <cmd>` shows detailed usage and description
 
 ## Getting Started
 
@@ -42,64 +47,20 @@ Current version: `V0.0.1`
    ```
 
 2. Configure hardware interfaces:
-   - Modify `lwcli_port.c` to implement interface functions (`lwcli_malloc`, `lwcli_free`, `lwcli_hardware_init`, `lwcli_output_char`, `lwcli_output`, `lwcli_receive`) for your target hardware platform.
-   - Ensure hardware driver dependencies (`usart_drv.h`, `mydebug.h`, `malloc.h`) are properly configured.
+   - Modify `lwcli_port.c` to implement interface functions (`lwcli_malloc`, `lwcli_free`, `lwcli_hardware_init`, `lwcli_output`) for your target hardware platform.
 
 3. Build the project:
-   - Include `lwcli.c`, `lwcli_task.c`, `lwcli_port.c`, `lwcli.h`, `lwcli_config.h`, and `main.c` in your embedded project.
-   - Configure the FreeRTOS environment, setting task stack size and priority.
+   - Include `lwcli.c`, `lwcli_port.c`, `lwcli.h`, `lwcli_config.h` in your embedded project.
 
-4. Start the task:
-   - Call `lwcli_task_start(StackDepth, uxPriority)` to create the lwcli task.
-   - Example:
-     ```c
-     lwcli_task_start(512, 4); // Stack size: 512 bytes, Priority: 4
-     ```
 
-### Usage Example
+### Usage Examples
 
-The `main.c` file provides a sample implementation demonstrating how to initialize lwcli and register commands. **Note**: This file is for interface demonstration only and cannot be run directly without hardware-specific implementation.
+`lwcli/example/linux/main.c` provides a bare-metal/Linux example showing initialization, command registration, and processing.
 
-#### Sample Code
-```c
-#include "lwcli.h"
+`lwcli/example/FreeRTOS/main.c` provides a FreeRTOS example with task-based integration.
 
-void test_command_callback(char **args, uint8_t arge_num) {
-    for (int i = 0; i < arge_num; i++) {
-        printf("%s ", args[i]); // Print all parameters
-    }
-    printf("\r\n");
-}
+In `lwcli/example/linux/`, the script `build_run.sh` allows you to compile and run the example directly on Linux.
 
-void lwcli_init(void) {
-    lwcli_task_start(512, 4); // Start lwcli task
-    lwcli_regist_command("test", "help string of test command", test_command_callback); // Register test command
-}
-
-int main(void) {
-    lwcli_init();
-    vTaskStartScheduler();
-    while (1) {
-        /* never run to here */
-    }
-    return 0;
-}
-```
-
-#### Runtime Behavior
-- On startup, lwcli outputs a welcome message:
-  ```
-  lwcli start, nType Help to view a list of registered commands
-  ```
-- Enter `help` to list registered commands:
-  ```
-  test:    help string of test command
-  ```
-- Enter `test 123 456 -789` to execute the custom command, outputting:
-  ```
-  123 456 -789
-  ```
-- Use the up (`↑`) and down (`↓`) arrow keys (if history is enabled) to navigate command history.
 
 #### Command History
 - Supports up to 10 command history entries.
@@ -133,13 +94,13 @@ Modify these parameters to suit your needs, keeping memory constraints in mind.
 lwcli/
 ├── src/                # Source files required for porting
 │   ├── lwcli.c         # Core command parsing logic
-│   ├── lwcli_task.c    # FreeRTOS task implementation
 │   └── lwcli_port.c    # Hardware abstraction layer (user-implemented)
 ├── inc/                # Header files required for porting
 │   ├── lwcli.h         # User interface header
 │   └── lwcli_config.h  # Configuration header
 ├── example/            # Usage examples
-│   └── main.c          # Example code (interface demo only, not directly runnable)
+|   ├──linux            # Example code for Linux
+│   └──FReeRTOS         # Example code for FreeRTOS
 ├── LICENSE             # MIT License
 ├── README.md           # Chinese documentation
 └── README_EN.md        # English documentation

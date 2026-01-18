@@ -2,7 +2,7 @@
  * @file lwcli_config.h
  * @author GYM (48060945@qq.com)
  * @brief 用户配置参数文件
- * @version V0.0.3
+ * @version V0.0.4
  * @date 2025-10-19
  * 
  * @copyright Copyright (c) 2025
