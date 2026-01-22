@@ -19,18 +19,10 @@
 #include "stdbool.h"
 
 /* lwcli_port 接口 */
-extern uint16_t lwcli_receive(char *buffer, uint16_t buffer_size, uint32_t time_out);
 extern void *lwcli_malloc(size_t size);
 extern void lwcli_output_char(char output_char);
 extern void lwcli_output(char *output_string, uint16_t string_len);
-extern void lwcli_hardware_init(void);
 
-/*lwcli.c 函数*/
-extern void lwcli_process_receive_char(char revChar);
-extern void lwcli_software_init(void);
-#if (LWCLI_WITH_FILE_SYSTEM == true)
-extern void lwcli_output_file_path(void);
-#endif
 
 #if (LWCLI_ENABLE_REMOTE_COMMAND == true)
 /**
@@ -98,8 +90,8 @@ void lwcli_task(void *pvparameters)
 {
     char *receive_buffer  = NULL;
     uint16_t receive_length = 0;
-    lwcli_software_init();
     lwcli_hardware_init();
+    lwcli_software_init();
     receive_buffer = (char *)lwcli_malloc(LWCLI_RECEIVE_BUFFER_SIZE);
     #if (LWCLI_ENABLE_REMOTE_COMMAND == true)
     remote_cmd_info.command = (char *)lwcli_malloc(LWCLI_RECEIVE_BUFFER_SIZE);
@@ -112,9 +104,6 @@ void lwcli_task(void *pvparameters)
         while (1);
     }
     lwcli_output(wellcome_message, strlen(wellcome_message));
-#if (LWCLI_WITH_FILE_SYSTEM == true)
-    lwcli_output_file_path();
-#endif
     while(1)
     {
         #if (LWCLI_ENABLE_REMOTE_COMMAND == true)

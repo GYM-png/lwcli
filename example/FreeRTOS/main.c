@@ -27,7 +27,7 @@ void lwcli_init(void)
     lwcli_task_start(512, 4); // 启动lwcli 任务 传入任务栈大小和优先级
 
     /* 注册命令 */
-    lwcli_register_command("test", "help string of test command", test_command_callback);
+    lwcli_regist_command("test", "help string of test command", test_command_callback);
 }
 
 
