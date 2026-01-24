@@ -74,7 +74,7 @@ The `lwcli_config.h` file defines the following configuration parameters:
 | Parameter Name                    | Default Value | Description                              |
 |-----------------------------------|---------------|------------------------------------------|
 | `LWCLI_COMMAND_STR_MAX_LENGTH`    | 10            | Maximum command string length (excluding parameters) |
-| `LWCLI_HELP_STR_MAX_LENGTH`       | 100           | Maximum help string length                |
+| `LWCLI_BRIEF_MAX_LENGTH`       | 100           | Maximum help string length                |
 | `LWCLI_RECEIVE_BUFFER_SIZE`       | 50            | Receive buffer size                       |
 | `LWCLI_HISTORY_COMMAND_NUM`       | 10            | Maximum number of history commands (0 to disable) |
 | `LWCLI_WITH_FILE_SYSTEM`              | true                  | Enable file system prompt                |

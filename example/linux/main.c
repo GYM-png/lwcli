@@ -70,25 +70,41 @@ void date_func(int argc, char *argv[])
     }
 }
 
+void ls_func(int argc, char *argv[])
+{
+    if (argc){
+        printf("call by ls [%s]\r\n", argv[0]);
+    }   
+    else {
+        printf("call by ls \r\n");
+    }
+}
+
 int main(void)
 {
     system("stty -icanon");
     system("stty -echo");
     lwcli_software_init();
     int command_fd = 0;
-    command_fd = lwcli_regist_command("echo", "echo command", echo_func);
-    lwcli_regist_command_help(command_fd,
-    "echo [\"str\"]", 
-    "echo string behind the \"echo\"");
     command_fd = lwcli_regist_command("date", "get or set time", date_func);
-    lwcli_regist_command_help(command_fd,
-    "    [get]:get date info\r\n"
-    "    [set][\"2026/01/18 14:22:53\"]:change date info of system", 
-    NULL);
-    lwcli_regist_command("test2", "test command2", test_func);
+    lwcli_regist_command_parameter(command_fd, "get", "get data info");
+    lwcli_regist_command_parameter(command_fd, "set", "change date info of system, like: set \"2026/01/18 14:22:53\"\r\n");
+
+    command_fd = lwcli_regist_command("test2", "test command2", test_func);
+    lwcli_regist_command_parameter(command_fd, "para1", "test paramter fix");
+    lwcli_regist_command_parameter(command_fd, "para2", "test paramter fix");
+    lwcli_regist_command_parameter(command_fd, "para3", "test paramter fix");
     lwcli_regist_command("test3", "test command3", test_func);
     lwcli_regist_command("test4", "test command4", test_func);
 
+    /* 仿照linux系统提供的ls命令注册参数 */
+    command_fd = lwcli_regist_command("ls", "List information about the FILEs", ls_func);
+    lwcli_regist_command_parameter(command_fd, "-l", "use a long listing format");
+    lwcli_regist_command_parameter(command_fd, "-i", "print the index number of each file");
+    lwcli_regist_command_parameter(command_fd, "-a", "do not ignore entries starting with");
+    lwcli_regist_command_parameter(command_fd, "-u", "with -lt: sort by, and show, access time;\r\n"
+                                                "\twith -l: show access time and sort by name;\r\n"
+                                                "\totherwise: sort by access time, newest first");
     while(1)
     {
         lwcli_process_receive_char(getchar());

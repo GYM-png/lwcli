@@ -1,7 +1,7 @@
 /**
  * @file lwcli.h
  * @author GYM (48060945@qq.com)
- * @brief 用户包含头文件
+ * @brief User Include Header File
  * @version V0.0.4
  * @date 2025-10-19
  * 
@@ -16,6 +16,7 @@
 #endif
 
 #include "stdint.h"
+#include "lwcli_config.h"
 
 #define LWCLI_VERSION "V0.0.4"
 
@@ -69,16 +70,19 @@ typedef void (*user_callback_f)(int argc, char* argv[]);
  */
 int lwcli_regist_command(const char *command, const char *brief, user_callback_f user_callback);
 
+#if (LWCLI_PARAMETER_COMPLETION == true)
 /**
- * @brief Register detailed help information for a command
- * @param command_fd    Command descriptor returned by lwcli_regist_command()
- * @param usage         Usage syntax string (e.g. "led <on|off> [index]"), can be NULL
- * @param description   Detailed explanation, examples, notes (multi-line supported), can be NULL
+ * @brief Register a parameter for a command (used for help display and tab completion)
+ * @param command_fd  Command descriptor returned by lwcli_regist_command()
+ * @param parameter   Parameter string (e.g. "<on|off>", "[filename]", "-h", "--help")
+ * @param description Detailed description of this parameter (can be NULL)
  * 
- * @note Call this function after lwcli_regist_command() if you want to provide
- *       richer help output when user types "help <command>".
+ * @note This function allows you to attach parameter information to a command,
+ *       which can be shown in detailed help (via "help <cmd>") and potentially
+ *       used for intelligent tab completion in the future.
  */
-void lwcli_regist_command_help(int command_fd, const char *usage, const char *description);
+void lwcli_regist_command_parameter(int command_fd, const char *parameter, const char *description);
+#endif
 
 /**
  * @brief Process one received character

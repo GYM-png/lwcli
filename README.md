@@ -74,7 +74,7 @@
 | 参数名                        | 默认值 | 描述                              |
 |-------------------------------|--------|-----------------------------------|
 | `LWCLI_COMMAND_STR_MAX_LENGTH` | 10                   | 命令字符串最大长度（不含参数）    |
-| `LWCLI_HELP_STR_MAX_LENGTH`        | 100              | 帮助字符串最大长度                |
+| `LWCLI_BRIEF_MAX_LENGTH`        | 100              | 帮助字符串最大长度                |
 | `LWCLI_RECEIVE_BUFFER_SIZE`        | 50               | 接收缓冲区大小                    |
 | `LWCLI_HISTORY_COMMAND_NUM`        | 10               | 历史命令最大数量（0 禁用历史记录）|
 | `LWCLI_WITH_FILE_SYSTEM`          | true              | 是否启用文件系统提示符     |
