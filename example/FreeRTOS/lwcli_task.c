@@ -19,8 +19,6 @@
 #include "stdbool.h"
 
 /* lwcli_port 接口 */
-extern void *lwcli_malloc(size_t size);
-extern void lwcli_output_char(char output_char);
 extern void lwcli_output(char *output_string, uint16_t string_len);
 
 
@@ -90,20 +88,16 @@ void lwcli_task(void *pvparameters)
 {
     char *receive_buffer  = NULL;
     uint16_t receive_length = 0;
-    lwcli_hardware_init();
-    lwcli_software_init();
-    receive_buffer = (char *)lwcli_malloc(LWCLI_RECEIVE_BUFFER_SIZE);
+    receive_buffer = (char *)pvPortMalloc(LWCLI_RECEIVE_BUFFER_SIZE);
     #if (LWCLI_ENABLE_REMOTE_COMMAND == true)
-    remote_cmd_info.command = (char *)lwcli_malloc(LWCLI_RECEIVE_BUFFER_SIZE);
+    remote_cmd_info.command = (char *)pvPortMalloc(LWCLI_RECEIVE_BUFFER_SIZE);
     #endif
-    char *wellcome_message = "lwcli start, nType Help to view a list of registered commands\r\n";
     if (receive_buffer == NULL)
     {
         char *error_message = "lwcli malloc error before start\r\n";
         lwcli_output(error_message, strlen(error_message));
         while (1);
     }
-    lwcli_output(wellcome_message, strlen(wellcome_message));
     while(1)
     {
         #if (LWCLI_ENABLE_REMOTE_COMMAND == true)
@@ -133,6 +127,8 @@ void lwcli_task(void *pvparameters)
  */
 void lwcli_task_start(const uint16_t StackDepth, const uint8_t uxPriority)
 {
+    lwcli_hardware_init();
+    lwcli_software_init();
     taskENTER_CRITICAL();
     xTaskCreate((TaskFunction_t )lwcli_task,    //任务函数
                 (const char *   )"lwcli",       //任务名称

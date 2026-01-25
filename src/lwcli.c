@@ -283,8 +283,8 @@ int lwcli_regist_command(const char *command, const char *brief, user_callback_f
     lwcliObj.command_num++;
     #if (LWCLI_PARAMETER_COMPLETION == true)
     if (lwcliObj.help_fd) {
-        char buffer[LWCLI_COMMAND_STR_MAX_LENGTH + 20] = {};
-        snprintf(buffer, LWCLI_COMMAND_STR_MAX_LENGTH + 20, "get the detail of [%s]", command);
+        char buffer[LWCLI_COMMAND_STR_MAX_LENGTH + 30] = {0};
+        snprintf(buffer, sizeof(buffer), "get the detail of [%s]", command);
         lwcli_regist_command_parameter(lwcliObj.help_fd, command, buffer);
     }
     #endif
