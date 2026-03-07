@@ -161,7 +161,7 @@ static const char ansi_cursor_right[] = "\033[C";
 static const char ansi_cursor_up[] = "\033[A";
 static const char ansi_cursor_down[] = "\033[B";
 static const char ansi_clear_screen[] = "\033[2J";
-static const char ansi_claer_line[] = "\033[2K\r";
+static const char ansi_clear_line[] = "\033[2K\r";
 static const char ansi_clear_behind[] = "\033[K";
 static const char ansi_cursor_save[] = "\033[s";
 static const char ansi_cursor_restore[] = "\033[u";
@@ -439,8 +439,10 @@ static void lwcli_printf(const char *format, ...)
 {
     va_list args;
     va_start(args, format);
-    uint16_t print_len = vsnprintf(lwcliObj.ouputBuffer, sizeof(lwcliObj.ouputBuffer), format, args);
+    int ret = vsnprintf(lwcliObj.ouputBuffer, sizeof(lwcliObj.ouputBuffer), format, args);
     va_end(args);
+    uint16_t print_len = (ret < 0 || (size_t)ret >= sizeof(lwcliObj.ouputBuffer))
+                        ? (uint16_t)(sizeof(lwcliObj.ouputBuffer) - 1) : (uint16_t)ret;
     lwcli_output(lwcliObj.ouputBuffer, print_len);
 }
 
@@ -610,6 +612,9 @@ static void lwcli_process_command(char *command)
 static uint8_t lwcli_get_parameter_number(const char *command_string)
 {
     uint8_t len = strlen(command_string);
+    if (len <= 1) {
+        return 0;
+    }
     bool in_quotes = false; // 是否处于引号中
     uint8_t parameter_num = 0, quotes_num = 0;
     for (uint8_t i = 0; i < len - 1; i++) {
@@ -637,6 +642,9 @@ static uint8_t lwcli_get_parameter_number(const char *command_string)
 static uint8_t lwcli_find_parameters(const char *argv_str, char **parameter_arry, uint8_t parameter_num)
 {
     uint8_t len = strlen(argv_str);
+    if (len <= 1) {
+        return 0;
+    }
     uint8_t found_num = 0;
     bool in_quotes = false; // 是否处于引号中
 
@@ -751,7 +759,7 @@ static void lwcli_fix_command(void)
                     lwcliObj.inputBufferPos = node->cmd_len;
                     lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = ' ';
                     lwcliObj.cursorPos = lwcliObj.inputBufferPos;
-                    lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
+                    lwcli_output(ansi_clear_line, sizeof(ansi_clear_line));
                     #if (LWCLI_WITH_FILE_SYSTEM == true)
                     lwcli_output_file_path();
                     #endif // LWCLI_WITH_FILE_SYSTEM == true
@@ -862,7 +870,7 @@ static void lwcil_fix_parameter(cmdList_t *cmd_node)
                     lwcliObj.inputBufferPos = para_node->len + cmd_node->cmd_len + 1;
                     lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = ' ';
                     lwcliObj.cursorPos = lwcliObj.inputBufferPos;
-                    lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
+                    lwcli_output(ansi_clear_line, sizeof(ansi_clear_line));
                     #if (LWCLI_WITH_FILE_SYSTEM == true)
                     lwcli_output_file_path();
                     #endif // LWCLI_WITH_FILE_SYSTEM == true
@@ -919,6 +927,9 @@ static void lwcil_fix_parameter(cmdList_t *cmd_node)
  */
 static void lwcli_table_process(void)
 {
+    if (lwcliObj.cmdListHead == NULL) {
+        return;
+    }
     cmdList_t *node = lwcliObj.cmdListHead;
     bool compelter_par = false;
     if (!lwcliObj.inputBufferPos) {
@@ -1025,7 +1036,7 @@ static void lwcli_history_command_up(void)
     lwcliObj.inputBuffer[historyCommandLen] = '\0';
     lwcliObj.inputBufferPos = historyCommandLen;
 
-    lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
+    lwcli_output(ansi_clear_line, sizeof(ansi_clear_line));
     #if (LWCLI_WITH_FILE_SYSTEM == true)
     lwcli_output_file_path();
     #endif // LWCLI_WITH_FILE_SYSTEM == true
@@ -1046,7 +1057,7 @@ static void lwcli_history_command_down(void)
 
     if (lwcli_history_is_full()) {
         if (lwcliObj.historyList.findPos >= LWCLI_HISTORY_COMMAND_NUM - 1) { // 还没有使用UP键，则不允许使用Down 或者 Down到最后一个了
-            lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
+            lwcli_output(ansi_clear_line, sizeof(ansi_clear_line));
             #if (LWCLI_WITH_FILE_SYSTEM == true)
             lwcli_output_file_path();
             #endif // LWCLI_WITH_FILE_SYSTEM == true
@@ -1063,8 +1074,8 @@ static void lwcli_history_command_down(void)
         }
     }
     else {
-        if (lwcliObj.historyList.findPos >= lwcliObj.historyList.writePos - 1){  // 还没有使用UP键，则不允许使用Down 或者 Down到最后一个了
-            lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
+        if (lwcliObj.historyList.findPos >= lwcliObj.historyList.writePos){  // 处于当前输入位置，Down 应清空
+            lwcli_output(ansi_clear_line, sizeof(ansi_clear_line));
             #if (LWCLI_WITH_FILE_SYSTEM == true)
             lwcli_output_file_path();
             #endif // LWCLI_WITH_FILE_SYSTEM == true
@@ -1090,7 +1101,7 @@ static void lwcli_history_command_down(void)
     lwcliObj.inputBuffer[historyCommandLen] = '\0';
     lwcliObj.inputBufferPos = historyCommandLen;
 
-    lwcli_output(ansi_claer_line, sizeof(ansi_claer_line));
+    lwcli_output(ansi_clear_line, sizeof(ansi_clear_line));
     #if (LWCLI_WITH_FILE_SYSTEM == true)
     lwcli_output_file_path();
     #endif // LWCLI_WITH_FILE_SYSTEM == true
