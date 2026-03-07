@@ -202,6 +202,7 @@ void lwcli_software_init(void)
         lwcli_printf("lwcli malloc error\r\n");
         return;
     }
+    lwcliObj.cmdListHead->next = NULL;
     int command_fd = 0;
     command_fd = lwcli_regist_command("help", "list all commands", lwcli_help);
 #if (LWCLI_PARAMETER_COMPLETION == true)
@@ -322,12 +323,14 @@ void lwcli_regist_command_parameter(int command_fd, const char *parameter, const
     new_para_node->data = lwcli_parameter_malloc(strlen(parameter) + 1);
     if (new_para_node->data == NULL) {
         lwcli_printf("%s %d ,malloc error ", __FILE__, __LINE__);
+        lwcli_free(new_para_node);
         return;
     }
     if (description) {
         new_para_node->description = (char *)lwcli_malloc(strlen(description) + 1);
         if (new_para_node->description == NULL) {
             lwcli_printf("%s %d ,malloc error ", __FILE__, __LINE__);
+            lwcli_free(new_para_node);
             return;
         }
     }
@@ -396,6 +399,10 @@ static void lwcli_help(int argc, char* argv[])
                 break;
             }
             node = node->next;
+        }
+        if (node == NULL) {
+            lwcli_printf("Error: \"%s\" not found. Enter \"help\" to view available commands.\r\n", argv[0]);
+            return;
         }
         lwcli_printf("%s  %s\r\n", node->command, node->brief);
     #if (LWCLI_PARAMETER_COMPLETION == true)
@@ -791,7 +798,8 @@ static void lwcli_fix_command(void)
         uint16_t output_len = snprintf(lwcliObj.ouputBuffer, sizeof(lwcliObj.ouputBuffer), "\r\n\r\n%s", lwcliObj.inputBuffer);
         lwcli_output(lwcliObj.ouputBuffer, output_len);
         #endif // LWCLI_WITH_FILE_SYSTEM == true
-        
+
+        lwcli_free(match_arr);
     }
 }
 
@@ -802,8 +810,8 @@ static void lwcli_fix_command(void)
  */
 static void lwcil_fix_parameter(cmdList_t *cmd_node)
 {
-    parameter_t *para_node = &cmd_node->parameter_head;
-    if (para_node->next == NULL) {
+    parameter_t *para_node = cmd_node->parameter_head.next;
+    if (para_node == NULL) {
         return;
     }
     const char *prefix = lwcliObj.inputBuffer + cmd_node->cmd_len + 1;
@@ -899,8 +907,9 @@ static void lwcil_fix_parameter(cmdList_t *cmd_node)
         #else
         uint16_t output_len = snprintf(lwcliObj.ouputBuffer, sizeof(lwcliObj.ouputBuffer), "\r\n\r\n%s", lwcliObj.inputBuffer);
         lwcli_output(lwcliObj.ouputBuffer, output_len);
-        #endif // LWCLI_WITH_FILE_SYSTEM == true
-        
+        #endif // LWCLI_PARAMETER_COMPLETION == true
+
+        lwcli_free(match_arr);
     }
 }
 #endif // LWCLI_PARAMETER_COMPLETION == true
