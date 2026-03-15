@@ -11,6 +11,7 @@ set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -O0")  # 添加-g调试符号
 # 添加lwcli库
 add_library(lwcli STATIC
     ${PROJECT_ROOT}/src/lwcli.c
+    ${PROJECT_ROOT}/src/lwcli_list.c
     ${PROJECT_ROOT}/port/lwcli_port.c
 )
 

@@ -9,6 +9,7 @@
  * 
  */
 #include "lwcli.h"
+#include "lwcli_list.h"
 #include "stdio.h"
 #include "stdbool.h"
 #include "stdlib.h"
@@ -23,8 +24,8 @@ typedef struct parameter_list
     char *data;
     uint8_t len;
     char *description;
-    struct parameter_list *next;
-}parameter_t;
+    list_node_t node;
+} parameter_t;
 
 typedef struct
 {
@@ -35,19 +36,19 @@ typedef struct
 static pool_manage_t parameter_pool = {.size = LWCLI_PARAMETER_BUFFER_POOL_SIZE, .pos = 0};
 #endif // LWCLI_PARAMETER_COMPLETION == true
 
-typedef struct cmdList
+typedef struct command
 {
     char command[LWCLI_COMMAND_STR_MAX_LENGTH];
     char brief[LWCLI_BRIEF_MAX_LENGTH];
 
 #if (LWCLI_PARAMETER_COMPLETION == true)
-    parameter_t parameter_head;
+    parameter_t para;   /* 参数链表头，仅使用 para.node，data/len/description 未使用 */
 #endif
 
     uint8_t cmd_len;
     user_callback_f callback;
-    struct cmdList *next;
-}cmdList_t;
+    list_node_t node;
+} command_t;
 
 #if (LWCLI_HISTORY_COMMAND_NUM > 0)
 typedef struct
@@ -99,7 +100,7 @@ static char *colorTable[] = {
 
 typedef struct 
 {
-    cmdList_t *cmdListHead;
+    command_t *command;
     uint8_t command_num;
     /** 输入输出缓冲区 **/
     char inputBuffer[LWCLI_RECEIVE_BUFFER_SIZE];
@@ -129,7 +130,7 @@ static void lwcli_table_process(void);
 static void lwcli_fix_command(void);
 
 #if (LWCLI_PARAMETER_COMPLETION == true)
-static void lwcil_fix_parameter(cmdList_t *cmd_node);
+static void lwcil_fix_parameter(command_t *cmd);
 static char *lwcli_parameter_malloc(uint32_t size);
 #endif 
 
@@ -192,13 +193,16 @@ static const char lwcli_reminder[] = "Error: \"%s\" not registered.  Enter \"hel
  */
 void lwcli_software_init(void)
 {
-    /** 初始化头节点并绑定帮助命令 */
-    lwcliObj.cmdListHead = (cmdList_t *)lwcli_malloc(sizeof(cmdList_t));
-    if (lwcliObj.cmdListHead == NULL) {
+    /** 初始化命令链表头节点 */
+    lwcliObj.command = (command_t *)lwcli_malloc(sizeof(command_t));
+    if (lwcliObj.command == NULL) {
         lwcli_printf("lwcli malloc error\r\n");
         return;
     }
-    lwcliObj.cmdListHead->next = NULL;
+    list_head_init(&lwcliObj.command->node);
+#if (LWCLI_PARAMETER_COMPLETION == true)
+    list_head_init(&lwcliObj.command->para.node);
+#endif
     int command_fd = 0;
     command_fd = lwcli_regist_command("help", "list all commands", lwcli_help);
 #if (LWCLI_PARAMETER_COMPLETION == true)
@@ -253,30 +257,26 @@ int lwcli_regist_command(const char *command, const char *brief, user_callback_f
         lwcli_printf("help string too long please modify LWCLI_BRIEF_MAX_LENGTH \r\n");
         return -1;
     }
-    if (lwcliObj.cmdListHead == NULL) {
+    if (lwcliObj.command == NULL) {
         lwcli_printf("please call lwcli_software_init before regist command \r\n");
         return -1;
     }
-    cmdList_t *newNode = (cmdList_t *) lwcli_malloc(sizeof(cmdList_t));
-    cmdList_t *pnode = lwcliObj.cmdListHead;
-    if (newNode == NULL) {
+    command_t *new_cmd = (command_t *)lwcli_malloc(sizeof(command_t));
+    if (new_cmd == NULL) {
         lwcli_printf("lwcli malloc error\r\n");
         return -1;
     }
-    newNode->cmd_len = strlen(command);
-    memcpy(newNode->command, command, newNode->cmd_len);
-    newNode->command[newNode->cmd_len] = '\0';
-    memcpy(newNode->brief, brief, strlen(brief));
-    newNode->brief[strlen(brief)] = '\0';
-    newNode->callback = user_callback;
-    newNode->next = NULL;
-    #if (LWCLI_PARAMETER_COMPLETION == true)
-    newNode->parameter_head.next = NULL;
-    #endif 
-    while (pnode->next) {
-        pnode = pnode->next;
-    }
-    pnode->next = newNode;
+    new_cmd->cmd_len = strlen(command);
+    memcpy(new_cmd->command, command, new_cmd->cmd_len);
+    new_cmd->command[new_cmd->cmd_len] = '\0';
+    memcpy(new_cmd->brief, brief, strlen(brief));
+    new_cmd->brief[strlen(brief)] = '\0';
+    new_cmd->callback = user_callback;
+#if (LWCLI_PARAMETER_COMPLETION == true)
+    list_head_init(&new_cmd->para.node);
+#endif
+    list_node_init(&new_cmd->node);
+    list_add_tail(&lwcliObj.command->node, &new_cmd->node);
     lwcliObj.command_num++;
     #if (LWCLI_PARAMETER_COMPLETION == true)
     if (lwcliObj.help_fd) {
@@ -300,44 +300,42 @@ void lwcli_regist_command_parameter(int command_fd, const char *parameter, const
     lwcli_assert(command_fd > 0);
     lwcli_assert(command_fd <= lwcliObj.command_num);
     lwcli_assert(parameter);
-    cmdList_t *cmd_node = lwcliObj.cmdListHead;
-    parameter_t *para_node = NULL, *new_para_node = NULL;
+    command_t *cmd = NULL;
+    parameter_t *new_param = NULL;
+    int i = 0;
 
-    for (int i = 0; i < command_fd; i++) {
-        cmd_node = cmd_node->next;
+    list_for_each_entry(cmd, &lwcliObj.command->node, node, command_t) {
+        if (++i == command_fd) break;
     }
-    para_node = &cmd_node->parameter_head;
+    if (i != command_fd) return;
 
-    while (para_node->next) {
-        para_node = para_node->next;
-    }
-    new_para_node = (parameter_t *)lwcli_malloc(sizeof(parameter_t));
-    if (new_para_node == NULL) {
+    new_param = (parameter_t *)lwcli_malloc(sizeof(parameter_t));
+    if (new_param == NULL) {
         lwcli_printf("%s %d ,malloc error ", __FILE__, __LINE__);
         return;
     }
-    new_para_node->data = lwcli_parameter_malloc(strlen(parameter) + 1);
-    if (new_para_node->data == NULL) {
+    new_param->data = lwcli_parameter_malloc(strlen(parameter) + 1);
+    if (new_param->data == NULL) {
         lwcli_printf("%s %d ,malloc error ", __FILE__, __LINE__);
-        lwcli_free(new_para_node);
+        lwcli_free(new_param);
         return;
     }
     if (description) {
-        new_para_node->description = (char *)lwcli_malloc(strlen(description) + 1);
-        if (new_para_node->description == NULL) {
+        new_param->description = (char *)lwcli_malloc(strlen(description) + 1);
+        if (new_param->description == NULL) {
             lwcli_printf("%s %d ,malloc error ", __FILE__, __LINE__);
-            lwcli_free(new_para_node);
+            lwcli_free(new_param);
             return;
         }
     }
 
-    para_node->next = new_para_node;
-    new_para_node->next = NULL;
-    new_para_node->len = strlen(parameter);
-    strcpy(new_para_node->data, parameter);
+    new_param->len = strlen(parameter);
+    strcpy(new_param->data, parameter);
     if (description) {
-        strcpy(new_para_node->description, description);
+        strcpy(new_param->description, description);
     }
+    list_node_init(&new_param->node);
+    list_add_tail(&cmd->para.node, &new_param->node);
 }
 
 /**
@@ -363,20 +361,20 @@ static char *lwcli_parameter_malloc(uint32_t size)
  */
 static void lwcli_help(int argc, char* argv[])
 {
-    cmdList_t *node = lwcliObj.cmdListHead->next;
+    command_t *cmd = NULL;
     uint16_t output_len = 0;
     memset(lwcliObj.ouputBuffer, 0, sizeof(lwcliObj.ouputBuffer));
     if (argc == 0){
-        while(node) {
-            if (node->brief[0] != '\0') {
-                memcpy(lwcliObj.ouputBuffer, node->command, node->cmd_len);
-                output_len = node->cmd_len;
+        list_for_each_entry(cmd, &lwcliObj.command->node, node, command_t) {
+            if (cmd->brief[0] != '\0') {
+                memcpy(lwcliObj.ouputBuffer, cmd->command, cmd->cmd_len);
+                output_len = cmd->cmd_len;
                 lwcliObj.ouputBuffer[output_len++] = ':';
-                for (uint16_t i = 0; i < (LWCLI_COMMAND_STR_MAX_LENGTH + 3 - (node->cmd_len + 1) + 4); i++) {
+                for (uint16_t i = 0; i < (LWCLI_COMMAND_STR_MAX_LENGTH + 3 - (cmd->cmd_len + 1) + 4); i++) {
                     lwcliObj.ouputBuffer[output_len++] = ' ';
                 }
-                uint16_t helpStrLen = strlen(node->brief);
-                memcpy(lwcliObj.ouputBuffer + output_len, node->brief, helpStrLen);
+                uint16_t helpStrLen = strlen(cmd->brief);
+                memcpy(lwcliObj.ouputBuffer + output_len, cmd->brief, helpStrLen);
                 output_len += helpStrLen;
                 lwcliObj.ouputBuffer[output_len++] = '\r';
                 lwcliObj.ouputBuffer[output_len++] = '\n';
@@ -385,36 +383,36 @@ static void lwcli_help(int argc, char* argv[])
                 lwcliObj.ouputBuffer[output_len++] = '\0';
                 lwcli_output(lwcliObj.ouputBuffer, output_len);
             }
-            node = node->next;
         }
     }
     else {
         uint16_t command_len = strlen(argv[0]);
-        while(node){
-            uint16_t cmp_len = (command_len > node->cmd_len) ? node->cmd_len : command_len;
-            if (cmp_len > 0 && memcmp(node->command, argv[0], cmp_len) == 0) {
+        cmd = NULL;
+        int found = 0;
+        list_for_each_entry(cmd, &lwcliObj.command->node, node, command_t) {
+            uint16_t cmp_len = (command_len > cmd->cmd_len) ? cmd->cmd_len : command_len;
+            if (cmp_len > 0 && memcmp(cmd->command, argv[0], cmp_len) == 0) {
+                found = 1;
                 break;
             }
-            node = node->next;
         }
-        if (node == NULL) {
+        if (!found || cmd == NULL) {
             lwcli_printf("Error: \"%s\" not found. Enter \"help\" to view available commands.\r\n", argv[0]);
             return;
         }
-        lwcli_printf("%s  %s\r\n", node->command, node->brief);
-    #if (LWCLI_PARAMETER_COMPLETION == true)
-        parameter_t *para_node = node->parameter_head.next;
-        while (para_node)
+        lwcli_printf("%s  %s\r\n", cmd->command, cmd->brief);
+#if (LWCLI_PARAMETER_COMPLETION == true)
         {
-            if (para_node->description) {
-                lwcli_printf("[%s]:   %s\r\n", para_node->data, para_node->description);
+            parameter_t *param = NULL;
+            list_for_each_entry(param, &cmd->para.node, node, parameter_t) {
+                if (param->description) {
+                    lwcli_printf("[%s]:   %s\r\n", param->data, param->description);
+                } else {
+                    lwcli_printf("[%s]:   no description\r\n", param->data);
+                }
             }
-            else {
-                lwcli_printf("[%s]:   no description\r\n", para_node->data);
-            }
-            para_node = para_node->next;
         }
-    #endif
+#endif
     }
 }
 
@@ -565,15 +563,15 @@ static uint8_t lwcli_match_command(const char *inputStr, const char *expected_co
  */
 static void lwcli_process_command(char *command)
 {
-    cmdList_t *node = lwcliObj.cmdListHead;
+    command_t *cmd = NULL;
     char *cmdParameter = NULL;
-    while (node) {
-        if (lwcli_match_command(command, node->command, node->cmd_len)) {
+    list_for_each_entry(cmd, &lwcliObj.command->node, node, command_t) {
+        if (lwcli_match_command(command, cmd->command, cmd->cmd_len)) {
             cmdParameter = command;
             // 寻找参数
             uint8_t parameter_num = lwcli_get_parameter_number(cmdParameter);
             if (parameter_num == 0) {
-                node->callback(0, NULL);
+                cmd->callback(0, NULL);
                 #if (LWCLI_WITH_FILE_SYSTEM == true)
                 lwcli_output_file_path();
                 #endif  // LWCLI_WITH_FILE_SYSTEM == true
@@ -585,8 +583,8 @@ static void lwcli_process_command(char *command)
                     lwcli_printf("error malloc\r\n");
                     return;
                 }
-                uint8_t findParameterNum = lwcli_find_parameters(cmdParameter + node->cmd_len, parameterArray, parameter_num);
-                node->callback(findParameterNum, parameterArray);
+                uint8_t findParameterNum = lwcli_find_parameters(cmdParameter + cmd->cmd_len, parameterArray, parameter_num);
+                cmd->callback(findParameterNum, parameterArray);
                 for (int i = 0; i < findParameterNum; ++i) {
                     lwcli_free(parameterArray[i]);
                 }
@@ -595,9 +593,8 @@ static void lwcli_process_command(char *command)
                 lwcli_output_file_path();
                 #endif // LWCLI_WITH_FILE_SYSTEM == true 
                 return;
-            }         
+            }
         }
-        node = node->next;
     }
 
     lwcli_printf(lwcli_reminder, command);
@@ -727,22 +724,19 @@ int lwcli_longest_common_prefix_length(int argc, char *argv[])
 static void lwcli_fix_command(void)
 {
     const char *prefix = lwcliObj.inputBuffer;
-    cmdList_t *node = lwcliObj.cmdListHead;
+    command_t *cmd = NULL;
     uint16_t match_num = 0;
     if (!lwcliObj.inputBufferPos) {
         return;
     }
-    while (node) {
-        if (lwcliObj.inputBufferPos < node->cmd_len) {
-            if (memcmp(node->command, prefix, lwcliObj.inputBufferPos) == 0) 
-            {
+    list_for_each_entry(cmd, &lwcliObj.command->node, node, command_t) {
+        if (lwcliObj.inputBufferPos < cmd->cmd_len) {
+            if (memcmp(cmd->command, prefix, lwcliObj.inputBufferPos) == 0) {
                 match_num++;
             }
         }
-        node = node->next;
     }
 
-    node = lwcliObj.cmdListHead;
     if (match_num == 0) {
         #if (LWCLI_WITH_FILE_SYSTEM == true)
         lwcli_output("\r\n", 2);
@@ -755,37 +749,35 @@ static void lwcli_fix_command(void)
         #endif // LWCLI_WITH_FILE_SYSTEM == true
     }
     else if (match_num == 1) {
-        while (node) {
-            if (lwcliObj.inputBufferPos < node->cmd_len) {
-                if (memcmp(node->command, prefix, lwcliObj.inputBufferPos) == 0) {
-                    memcpy(lwcliObj.inputBuffer, node->command, node->cmd_len);
-                    lwcliObj.inputBufferPos = node->cmd_len;
+        list_for_each_entry(cmd, &lwcliObj.command->node, node, command_t) {
+            if (lwcliObj.inputBufferPos < cmd->cmd_len) {
+                if (memcmp(cmd->command, prefix, lwcliObj.inputBufferPos) == 0) {
+                    memcpy(lwcliObj.inputBuffer, cmd->command, cmd->cmd_len);
+                    lwcliObj.inputBufferPos = cmd->cmd_len;
                     lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = ' ';
                     lwcliObj.cursorPos = lwcliObj.inputBufferPos;
                     lwcli_output(ansi_clear_line, sizeof(ansi_clear_line));
-                    #if (LWCLI_WITH_FILE_SYSTEM == true)
+#if (LWCLI_WITH_FILE_SYSTEM == true)
                     lwcli_output_file_path();
-                    #endif // LWCLI_WITH_FILE_SYSTEM == true
+#endif
                     lwcli_output(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
+                    break;
                 }
             }
-            node = node->next;
         }
-
     }
     else {
         char **match_arr = NULL;
         uint16_t match_index = 0;
-        match_arr = (char **)lwcli_malloc(sizeof(char *)  * match_num);
-        if (match_arr == NULL){
+        match_arr = (char **)lwcli_malloc(sizeof(char *) * match_num);
+        if (match_arr == NULL) {
             return;
         }
 
-        while (node) {
-            if (memcmp(node->command, prefix, lwcliObj.inputBufferPos) == 0) {
-                match_arr[match_index++] = node->command;
+        list_for_each_entry(cmd, &lwcliObj.command->node, node, command_t) {
+            if (memcmp(cmd->command, prefix, lwcliObj.inputBufferPos) == 0) {
+                match_arr[match_index++] = cmd->command;
             }
-            node = node->next;
         }
 
         uint16_t match_max_len = lwcli_longest_common_prefix_length(match_num, match_arr);
@@ -817,36 +809,32 @@ static void lwcli_fix_command(void)
 #if (LWCLI_PARAMETER_COMPLETION == true)
 /**
  * @brief 补全参数
- * @param cmd_node 参数所属的命令
+ * @param cmd 参数所属的命令
  */
-static void lwcil_fix_parameter(cmdList_t *cmd_node)
+static void lwcil_fix_parameter(command_t *cmd)
 {
-    parameter_t *para_node = cmd_node->parameter_head.next;
-    if (para_node == NULL) {
+    if (list_empty(&cmd->para.node)) {
         return;
     }
-    const char *prefix = lwcliObj.inputBuffer + cmd_node->cmd_len + 1;
-    int prefix_len = lwcliObj.inputBufferPos - cmd_node->cmd_len - 1;
+    const char *prefix = lwcliObj.inputBuffer + cmd->cmd_len + 1;
+    int prefix_len = lwcliObj.inputBufferPos - cmd->cmd_len - 1;
     uint16_t match_num = 0;
+    parameter_t *param = NULL;
     if (!lwcliObj.inputBufferPos) {
         return;
     }
-    while (para_node && prefix_len > 0) {
-        if (prefix_len < para_node->len) {
-            if (memcmp(para_node->data, prefix, (size_t)prefix_len) == 0) 
-            {
+    list_for_each_entry(param, &cmd->para.node, node, parameter_t) {
+        if (prefix_len > 0 && prefix_len < param->len) {
+            if (memcmp(param->data, prefix, (size_t)prefix_len) == 0) {
                 match_num++;
             }
         }
-        para_node = para_node->next;
     }
 
-    para_node = cmd_node->parameter_head.next;
     if (match_num == 0) {
         lwcli_output("\r\n", 2);
-        while (para_node) {
-            lwcli_printf("%s    ", para_node->data);
-            para_node = para_node->next;
+        list_for_each_entry(param, &cmd->para.node, node, parameter_t) {
+            lwcli_printf("%s    ", param->data);
         }
         #if (LWCLI_WITH_FILE_SYSTEM == true)
         lwcli_output("\r\n", 2);
@@ -866,37 +854,35 @@ static void lwcil_fix_parameter(cmdList_t *cmd_node)
         #endif // LWCLI_WITH_FILE_SYSTEM == true
     }
     else if (match_num == 1) {
-        while (para_node) {
-            if (prefix_len < para_node->len) {
-                if (memcmp(para_node->data, prefix, (size_t)prefix_len) == 0) {
-                    memcpy(lwcliObj.inputBuffer + cmd_node->cmd_len + 1, para_node->data, para_node->len);
-                    lwcliObj.inputBufferPos = para_node->len + cmd_node->cmd_len + 1;
+        list_for_each_entry(param, &cmd->para.node, node, parameter_t) {
+            if (prefix_len < param->len) {
+                if (memcmp(param->data, prefix, (size_t)prefix_len) == 0) {
+                    memcpy(lwcliObj.inputBuffer + cmd->cmd_len + 1, param->data, param->len);
+                    lwcliObj.inputBufferPos = param->len + cmd->cmd_len + 1;
                     lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = ' ';
                     lwcliObj.cursorPos = lwcliObj.inputBufferPos;
                     lwcli_output(ansi_clear_line, sizeof(ansi_clear_line));
-                    #if (LWCLI_WITH_FILE_SYSTEM == true)
+#if (LWCLI_WITH_FILE_SYSTEM == true)
                     lwcli_output_file_path();
-                    #endif // LWCLI_WITH_FILE_SYSTEM == true
+#endif
                     lwcli_output(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
+                    break;
                 }
             }
-            para_node = para_node->next;
         }
-
     }
     else {
         char **match_arr = NULL;
         uint16_t match_index = 0;
-        match_arr = (char **)lwcli_malloc(sizeof(char *)  * match_num);
-        if (match_arr == NULL){
+        match_arr = (char **)lwcli_malloc(sizeof(char *) * match_num);
+        if (match_arr == NULL) {
             return;
         }
 
-        while (para_node) {
-            if (memcmp(para_node->data, prefix, (size_t)prefix_len) == 0) {
-                match_arr[match_index++] = para_node->data;
+        list_for_each_entry(param, &cmd->para.node, node, parameter_t) {
+            if (memcmp(param->data, prefix, (size_t)prefix_len) == 0) {
+                match_arr[match_index++] = param->data;
             }
-            para_node = para_node->next;
         }
 
         uint16_t match_max_len = lwcli_longest_common_prefix_length(match_num, match_arr);
@@ -930,25 +916,23 @@ static void lwcil_fix_parameter(cmdList_t *cmd_node)
  */
 static void lwcli_table_process(void)
 {
-    if (lwcliObj.cmdListHead == NULL) {
+    if (lwcliObj.command == NULL) {
         return;
     }
-    cmdList_t *node = lwcliObj.cmdListHead;
+    command_t *cmd = NULL;
     bool compelter_par = false;
     if (!lwcliObj.inputBufferPos) {
         return;
     }
 #if (LWCLI_PARAMETER_COMPLETION == true)
-    while (node)
-    {
-        if(lwcli_match_command(lwcliObj.inputBuffer, node->command, node->cmd_len)){
+    list_for_each_entry(cmd, &lwcliObj.command->node, node, command_t) {
+        if (lwcli_match_command(lwcliObj.inputBuffer, cmd->command, cmd->cmd_len)) {
             compelter_par = true;
             break;
         }
-        node = node->next;
     }
     if (compelter_par) {
-        lwcil_fix_parameter(node);
+        lwcil_fix_parameter(cmd);
     }
     else {
         lwcli_fix_command();
