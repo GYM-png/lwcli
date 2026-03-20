@@ -1,6 +1,12 @@
 /**
  * @file lwcli_list.c
- * @brief 嵌入式单向链表实现
+ * @author GYM (48060945@qq.com)
+ * @brief lwcli 单向链表实现
+ * @version V0.0.4
+ * @date 2026-03-15
+ * 
+ * @copyright Copyright (c) 2026
+ * 
  */
 
 #include "lwcli_list.h"

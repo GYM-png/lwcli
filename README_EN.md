@@ -69,7 +69,7 @@ In `lwcli/example/linux/`, the script `build_run.sh` allows you to compile and r
 
 ## Configuration
 
-The `lwcli_config.h` file defines the following configuration parameters:
+The `lwcli_config.h` file defines the following configuration parameters (switch options use `true`/`false`):
 
 | Parameter Name                    | Default Value | Description                              |
 |-----------------------------------|---------------|------------------------------------------|
@@ -77,6 +77,8 @@ The `lwcli_config.h` file defines the following configuration parameters:
 | `LWCLI_BRIEF_MAX_LENGTH`       | 100           | Maximum help string length                |
 | `LWCLI_RECEIVE_BUFFER_SIZE`       | 50            | Receive buffer size                       |
 | `LWCLI_HISTORY_COMMAND_NUM`       | 10            | Maximum number of history commands (0 to disable) |
+| `LWCLI_PARAMETER_SPLIT`           | true          | Split parameters: true = `(int argc, char *argv[])`, false = `(char *argvs)` |
+| `LWCLI_PARAMETER_COMPLETION`      | true          | Enable parameter completion (requires `LWCLI_PARAMETER_SPLIT=true`) |
 | `LWCLI_WITH_FILE_SYSTEM`              | true                  | Enable file system prompt                |
 | `LWCLI_USER_NAME`                     | "lwcli@STM32"         | Username (only valid when file system is enabled) |
 
@@ -85,6 +87,10 @@ The `lwcli_config.h` file defines the following configuration parameters:
 >   `LWCLI_USER_NAME` + `:` + `current path` + `$ `  
 > - The current path is returned by the user-implemented `lwcli_get_file_path()` function in `lwcli_port.c`.  
 > - If the function is not implemented or returns `NULL`, the default path `/` will be shown.
+
+> **Parameter Mode**:  
+> - `LWCLI_PARAMETER_SPLIT = true`: Callback signature is `(int argc, char *argv[])`, parameters are auto-split.  
+> - `LWCLI_PARAMETER_SPLIT = false`: Callback signature is `(char *argvs)`, raw argument string is passed, parameter completion is disabled.
 
 Modify these parameters to suit your needs, keeping memory constraints in mind.
 

@@ -4,8 +4,11 @@
 #include <time.h>
 #include <string.h>
 
+#include "lwcli_config.h"
 
+#if (LWCLI_PARAMETER_SPLIT == true)
 #define LWCLI_STRSTR(n, str) strstr(argv[n], str)
+
 
 void test_func(int argc, char *argv[])
 {
@@ -111,3 +114,43 @@ int main(void)
     }
     return 0;
 }
+
+#else
+
+
+void test_func(char *argvs)
+{
+    printf("argvs = %s\n", argvs);
+}
+
+void echo_func(char *argvs)
+{
+    printf("argvs = %s\n", argvs);
+}
+
+void date_func(char *argvs)
+{
+    printf("argvs = %s\n", argvs);
+}
+
+void ls_func(char *argvs)
+{
+    printf("argvs = %s\n", argvs);
+}
+
+int main(void)
+{
+    system("stty -icanon");
+    system("stty -echo");
+    lwcli_software_init();
+    int command_fd = 0;
+    command_fd = lwcli_regist_command("test2", "test command2", test_func);
+    lwcli_regist_command("test3", "test command3", test_func);
+    lwcli_regist_command("test4", "test command4", test_func);
+    while(1)
+    {
+        lwcli_process_receive_char(getchar());
+    }
+    return 0;
+}
+#endif

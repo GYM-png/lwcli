@@ -69,7 +69,7 @@
 
 ## 配置说明
 
-`lwcli_config.h` 中定义了以下配置参数：
+`lwcli_config.h` 中定义了以下配置参数（开关类配置使用 `true`/`false`）：
 
 | 参数名                        | 默认值 | 描述                              |
 |-------------------------------|--------|-----------------------------------|
@@ -77,6 +77,8 @@
 | `LWCLI_BRIEF_MAX_LENGTH`        | 100              | 帮助字符串最大长度                |
 | `LWCLI_RECEIVE_BUFFER_SIZE`        | 50               | 接收缓冲区大小                    |
 | `LWCLI_HISTORY_COMMAND_NUM`        | 10               | 历史命令最大数量（0 禁用历史记录）|
+| `LWCLI_PARAMETER_SPLIT`          | true              | 是否分割参数：true 为 `(int argc, char *argv[])`，false 为 `(char *argvs)` |
+| `LWCLI_PARAMETER_COMPLETION`     | true              | 是否启用参数补全（需 `LWCLI_PARAMETER_SPLIT=true`）|
 | `LWCLI_WITH_FILE_SYSTEM`          | true              | 是否启用文件系统提示符     |
 | `LWCLI_USER_NAME`                 | "lwcli@STM32"     | 用户名（仅在文件系统启用时有效）|
 
@@ -85,6 +87,11 @@
 >   `LWCLI_USER_NAME` + `:` + `当前路径` + `$ `  
 > - 当前路径由用户在 `lwcli_port.c` 中实现 `lwcli_get_file_path()` 函数返回。  
 > - 若未实现该函数或返回 `NULL`，将显示默认路径 `/`。
+
+> **参数模式**：  
+> - `LWCLI_PARAMETER_SPLIT = true`：回调签名为 `(int argc, char *argv[])`，自动分割参数。  
+> - `LWCLI_PARAMETER_SPLIT = false`：回调签名为 `(char *argvs)`，传入原始参数字符串，参数补全自动关闭。
+
 修改这些参数以适配您的需求，但需注意内存占用。
 
 ## 项目结构
