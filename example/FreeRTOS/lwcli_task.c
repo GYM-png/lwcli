@@ -18,9 +18,6 @@
 #include "string.h"
 #include "stdbool.h"
 
-/* lwcli_port 接口 */
-extern void lwcli_output(char *output_string, uint16_t string_len);
-
 
 #if (LWCLI_ENABLE_REMOTE_COMMAND == true)
 /**
@@ -86,16 +83,17 @@ uint16_t lwcli_receive(char *buffer, uint16_t buffer_size, uint32_t time_out)
 
 void lwcli_task(void *pvparameters)
 {
+    const lwcli_opt_t *opt = (const lwcli_opt_t *)pvparameters;
     char *receive_buffer  = NULL;
     uint16_t receive_length = 0;
     receive_buffer = (char *)pvPortMalloc(LWCLI_RECEIVE_BUFFER_SIZE);
     #if (LWCLI_ENABLE_REMOTE_COMMAND == true)
     remote_cmd_info.command = (char *)pvPortMalloc(LWCLI_RECEIVE_BUFFER_SIZE);
     #endif
-    if (receive_buffer == NULL)
+    if (receive_buffer == NULL && opt != NULL && opt->output != NULL)
     {
-        char *error_message = "lwcli malloc error before start\r\n";
-        lwcli_output(error_message, strlen(error_message));
+        const char *error_message = "lwcli malloc error before start\r\n";
+        opt->output(error_message, strlen(error_message));
         while (1);
     }
     while(1)
@@ -122,20 +120,22 @@ void lwcli_task(void *pvparameters)
 
 /**
  * @brief 创建并启动lwcli任务
+ * @param opt 接口结构体，不可为 NULL
  * @param StackDepth 堆栈大小
- * @param uxPriority 优先级 
+ * @param uxPriority 优先级
  */
-void lwcli_task_start(const uint16_t StackDepth, const uint8_t uxPriority)
+void lwcli_task_start(const lwcli_opt_t *opt, const uint16_t StackDepth, const uint8_t uxPriority)
 {
-    lwcli_hardware_init();
+    if (opt == NULL) return;
+    lwcli_hardware_init(opt);
     lwcli_software_init();
     taskENTER_CRITICAL();
     xTaskCreate((TaskFunction_t )lwcli_task,    //任务函数
                 (const char *   )"lwcli",       //任务名称
                 (uint16_t       )StackDepth,    //任务堆栈大小
-                (void *         )NULL,          //任务参数
-                (UBaseType_t    )uxPriority,    //任务优先级
-                (TaskHandle_t * )NULL);         //任务句句柄
-    taskEXIT_CRITICAL();  
+                (void *         )(void *)opt,   //任务参数（传递 opt 供错误输出使用）
+                (UBaseType_t    )uxPriority,   //任务优先级
+                (TaskHandle_t *  )NULL);        //任务句柄
+    taskEXIT_CRITICAL();
 }
 

@@ -2,6 +2,7 @@
 #define __LWCLI_TASK_H
 
 #include "stdint.h"
+#include "lwcli.h"
 
 /**
  * @brief 是否支持远程命令
@@ -12,10 +13,11 @@
 
 /**
  * @brief 启动lwcli任务
+ * @param opt 接口结构体（malloc、free、output 等），不可为 NULL
  * @param StackDepth 栈大小
  * @param uxPriority 优先级
  */
-void lwcli_task_start(const uint16_t StackDepth, const uint8_t uxPriority);
+void lwcli_task_start(const lwcli_opt_t *opt, const uint16_t StackDepth, const uint8_t uxPriority);
 
 
 

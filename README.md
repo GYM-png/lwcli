@@ -25,7 +25,7 @@
 - **命令历史记录**：支持最多 `LWCLI_HISTORY_COMMAND_NUM` 条记录，使用上下箭头键浏览
 - **光标编辑**：支持左右方向键移动光标、Backspace/Delete 删除字符
 - **文件系统风格提示符**：启用 `LWCLI_WITH_FILE_SYSTEM` 后显示用户名:路径 $ （类似 Linux shell）
-- **跨平台**：通过 `lwcli_port.c` 硬件抽象层适配不同 MCU/串口/USB
+- **跨平台**：通过 `lwcli_opt_t` 函数指针注入适配不同 MCU/串口/USB，无需移植文件
 - **FreeRTOS 集成**：提供独立任务处理输入输出
 - **增强的帮助系统**：支持 `help` 列出所有命令、`help <cmd>` 查看详细用法和说明
 
@@ -47,15 +47,28 @@
    ```
 
 2. 配置硬件接口：
-    - 编辑 `lwcli_port.c` 中的接口函数 (`lwcli_malloc`, `lwcli_free`, `lwcli_hardware_init`, `lwcli_output`)，适配目标硬件平台。
+    - 实现 `lwcli_opt_t` 结构体中的函数指针（`malloc`, `free`, `output` 等），在调用 `lwcli_hardware_init(&opt)` 时传入。
 
 3. 编译项目：
-    - 将 `lwcli.c`, `lwcli_port.c`, `lwcli.h`, `lwcli_config.h` 加入您的嵌入式项目。
+    - 将 `lwcli.c`, `lwcli_list.c`, `lwcli.h`, `lwcli_config.h` 加入您的嵌入式项目。
 
 
 ### 使用示例
 
-`lwcli/example/linux/main.c` 提供了一个裸机示例，展示如何初始化 lwcli、注册命令和调用处理接口
+`lwcli/example/linux/main.c` 提供了一个裸机示例，展示如何初始化 lwcli、注册命令和调用处理接口。
+
+**接口注入示例**：
+```c
+static const lwcli_opt_t opt = {
+    .malloc = my_malloc,
+    .free = my_free,
+    .output = my_uart_output,
+    .hardware_init = my_uart_init,   /* 可选，NULL 表示不调用 */
+    .get_file_path = my_get_path,    /* 可选，LWCLI_WITH_FILE_SYSTEM 时有效 */
+};
+lwcli_hardware_init(&opt);
+lwcli_software_init();
+```
 
 `lwcli/example/FReeRTOS/main.c` 提供了一个FreeRTOS示例，展示如何初始化 lwcli、注册命令和调用处理接口
 
@@ -85,8 +98,8 @@
 > **文件系统支持**：  
 > - 启用 `LWCLI_WITH_FILE_SYSTEM = true` 后，提示符将显示为：  
 >   `LWCLI_USER_NAME` + `:` + `当前路径` + `$ `  
-> - 当前路径由用户在 `lwcli_port.c` 中实现 `lwcli_get_file_path()` 函数返回。  
-> - 若未实现该函数或返回 `NULL`，将显示默认路径 `/`。
+> - 当前路径由 `opt->get_file_path` 返回。  
+> - 若为 `NULL` 或未实现，将显示默认路径 `/`。
 
 > **参数模式**：  
 > - `LWCLI_PARAMETER_SPLIT = true`：回调签名为 `(int argc, char *argv[])`，自动分割参数。  
@@ -100,9 +113,9 @@
 lwcli/
 ├── src/                # 移植所需源文件
 │   ├── lwcli.c         # 核心命令解析逻辑
-│   └── lwcli_port.c    # 硬件抽象层（需用户实现）
+│   └── lwcli_list.c    # 单向链表实现
 ├── inc/                # 移植所需头文件
-│   ├── lwcli.h         # 用户接口头文件
+│   ├── lwcli.h         # 用户接口头文件（含 lwcli_opt_t）
 │   └── lwcli_config.h  # 配置参数头文件
 ├── example/            # 使用示例
 |   ├──linux            # Linux示例代码

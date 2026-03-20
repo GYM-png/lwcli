@@ -12,14 +12,12 @@ set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -O0")  # 添加-g调试符号
 add_library(lwcli STATIC
     ${PROJECT_ROOT}/src/lwcli.c
     ${PROJECT_ROOT}/src/lwcli_list.c
-    ${PROJECT_ROOT}/port/lwcli_port.c
 )
 
 # 添加头文件路径
 target_include_directories(lwcli
     PUBLIC 
         ${PROJECT_ROOT}/inc
-        ${PROJECT_ROOT}/port
 )
 
 # 添加示例程序

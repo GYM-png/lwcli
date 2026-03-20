@@ -1,5 +1,20 @@
 #include "lwcli.h"
 #include "lwcli_task.h"
+#include "lwcli_config.h"
+#include "FreeRTOS.h"
+#include <stdio.h>
+
+/* FreeRTOS 平台接口实现（用户可替换为 UART 等） */
+static void *opt_malloc(size_t size) { return pvPortMalloc(size); }
+static void opt_free(void *ptr) { vPortFree(ptr); }
+static void opt_output(const char *s, uint16_t len) {
+    /* TODO: 替换为 UART 发送 */
+    if (len == 1) putchar(*s);
+    else printf("%.*s", len, s);
+}
+#if (LWCLI_WITH_FILE_SYSTEM == true)
+static char *opt_get_file_path(void) { return "/"; }
+#endif
 
 /**
  * @brief 测试命令回调函数
@@ -61,7 +76,16 @@ void system_command_callback(int argc, char *argv[])
  */
 void lwcli_init(void)
 {
-    lwcli_task_start(512, 4); // 启动lwcli 任务 传入任务栈大小和优先级
+    static const lwcli_opt_t opt = {
+        .malloc = opt_malloc,
+        .free = opt_free,
+        .output = opt_output,
+        .hardware_init = NULL,
+#if (LWCLI_WITH_FILE_SYSTEM == true)
+        .get_file_path = opt_get_file_path,
+#endif
+    };
+    lwcli_task_start(&opt, 512, 4);  /* 启动 lwcli 任务 */
 
     /* 注册命令 */
     int command_fd = 0;

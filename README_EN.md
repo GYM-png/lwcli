@@ -25,7 +25,7 @@ Current version: `V0.0.4`
 - **Command history**: Supports up to `LWCLI_HISTORY_COMMAND_NUM` entries; navigate with up/down arrow keys
 - **Cursor editing**: Supports left/right arrow keys for cursor movement, Backspace/Delete for character removal
 - **File-system-style prompt**: When `LWCLI_WITH_FILE_SYSTEM` is enabled, displays `username:path $` (similar to Linux shell)
-- **Cross-platform**: Hardware abstraction layer in `lwcli_port.c` adapts to different MCUs, serial, or USB
+- **Cross-platform**: Function pointer injection via `lwcli_opt_t` adapts to different MCUs, serial, or USB without port files
 - **FreeRTOS integration**: Provides a dedicated task for input/output handling
 - **Enhanced help system**: `help` lists all commands; `help <cmd>` shows detailed usage and description
 
@@ -47,15 +47,28 @@ Current version: `V0.0.4`
    ```
 
 2. Configure hardware interfaces:
-   - Modify `lwcli_port.c` to implement interface functions (`lwcli_malloc`, `lwcli_free`, `lwcli_hardware_init`, `lwcli_output`) for your target hardware platform.
+   - Implement the function pointers in `lwcli_opt_t` (`malloc`, `free`, `output`, etc.) and pass them to `lwcli_hardware_init(&opt)`.
 
 3. Build the project:
-   - Include `lwcli.c`, `lwcli_port.c`, `lwcli.h`, `lwcli_config.h` in your embedded project.
+   - Include `lwcli.c`, `lwcli_list.c`, `lwcli.h`, `lwcli_config.h` in your embedded project.
 
 
 ### Usage Examples
 
 `lwcli/example/linux/main.c` provides a bare-metal/Linux example showing initialization, command registration, and processing.
+
+**Interface injection example**:
+```c
+static const lwcli_opt_t opt = {
+    .malloc = my_malloc,
+    .free = my_free,
+    .output = my_uart_output,
+    .hardware_init = my_uart_init,   /* optional, NULL to skip */
+    .get_file_path = my_get_path,   /* optional, when LWCLI_WITH_FILE_SYSTEM */
+};
+lwcli_hardware_init(&opt);
+lwcli_software_init();
+```
 
 `lwcli/example/FreeRTOS/main.c` provides a FreeRTOS example with task-based integration.
 
@@ -85,8 +98,8 @@ The `lwcli_config.h` file defines the following configuration parameters (switch
 > **File System Support**:  
 > - When `LWCLI_WITH_FILE_SYSTEM = true`, the prompt will display:  
 >   `LWCLI_USER_NAME` + `:` + `current path` + `$ `  
-> - The current path is returned by the user-implemented `lwcli_get_file_path()` function in `lwcli_port.c`.  
-> - If the function is not implemented or returns `NULL`, the default path `/` will be shown.
+> - The current path is returned by `opt->get_file_path`.  
+> - If the function is `NULL` or not implemented, the default path `/` will be shown.
 
 > **Parameter Mode**:  
 > - `LWCLI_PARAMETER_SPLIT = true`: Callback signature is `(int argc, char *argv[])`, parameters are auto-split.  
@@ -100,9 +113,9 @@ Modify these parameters to suit your needs, keeping memory constraints in mind.
 lwcli/
 ├── src/                # Source files required for porting
 │   ├── lwcli.c         # Core command parsing logic
-│   └── lwcli_port.c    # Hardware abstraction layer (user-implemented)
+│   └── lwcli_list.c    # Singly linked list implementation
 ├── inc/                # Header files required for porting
-│   ├── lwcli.h         # User interface header
+│   ├── lwcli.h         # User interface header (includes lwcli_opt_t)
 │   └── lwcli_config.h  # Configuration header
 ├── example/            # Usage examples
 |   ├──linux            # Example code for Linux

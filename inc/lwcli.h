@@ -16,19 +16,33 @@
 #endif
 
 #include "stdint.h"
+#include "stddef.h"
 #include "lwcli_config.h"
 
 #define LWCLI_VERSION "V0.0.4"
 
+/**
+ * @brief lwcli 可选接口结构体（通过函数指针注入）
+ * @note 用户实现这些接口并传入 lwcli_hardware_init()，无需再提供 lwcli_port.c
+ */
+typedef struct lwcli_opt {
+    void *(*malloc)(size_t size);                                    /**< 内存分配 */
+    void (*free)(void *ptr);                                         /**< 内存释放 */
+    void (*output)(const char *output_string, uint16_t string_len);  /**< 输出字符串到终端 */
+    void (*hardware_init)(void);                                     /**< 硬件初始化（可为 NULL）*/
+#if (LWCLI_WITH_FILE_SYSTEM == true)
+    char *(*get_file_path)(void);                                    /**< 获取当前路径（可为 NULL，默认 "/"）*/
+#endif
+} lwcli_opt_t;
 
 /**
- * @brief 硬件初始化函数
- * @note 初始化 lwcli 用于输入输出的底层硬件接口（如 UART 串口、USB CDC 等）。
- * 
- * 由用户在系统启动时调用，通常在 lwcli_software_init() 之前。
- * 应配置硬件外设、设置波特率、使能中断（若使用），并准备好基于字符的 I/O 通信通道。
+ * @brief 硬件初始化，注册用户接口
+ * @param opt 包含 malloc、free、output 等函数指针的结构体，不可为 NULL
+ *
+ * @note 必须在 lwcli_software_init() 之前调用。
+ *       若 opt->hardware_init 非空，会在此函数内调用以完成硬件初始化。
  */
-void lwcli_hardware_init(void);
+void lwcli_hardware_init(const lwcli_opt_t *opt);
 
 /**
  * @brief lwcli 软件初始化

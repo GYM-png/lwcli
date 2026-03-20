@@ -6,6 +6,17 @@
 
 #include "lwcli_config.h"
 
+/* Linux 平台接口实现 */
+static void *opt_malloc(size_t size) { return malloc(size); }
+static void opt_free(void *ptr) { free(ptr); }
+static void opt_output(const char *s, uint16_t len) {
+    if (len == 1) putchar(*s);
+    else printf("%.*s", len, s);
+}
+#if (LWCLI_WITH_FILE_SYSTEM == true)
+static char *opt_get_file_path(void) { return "/"; }
+#endif
+
 #if (LWCLI_PARAMETER_SPLIT == true)
 #define LWCLI_STRSTR(n, str) strstr(argv[n], str)
 
@@ -87,6 +98,16 @@ int main(void)
 {
     system("stty -icanon");
     system("stty -echo");
+    static const lwcli_opt_t opt = {
+        .malloc = opt_malloc,
+        .free = opt_free,
+        .output = opt_output,
+        .hardware_init = NULL,
+#if (LWCLI_WITH_FILE_SYSTEM == true)
+        .get_file_path = opt_get_file_path,
+#endif
+    };
+    lwcli_hardware_init(&opt);
     lwcli_software_init();
     int command_fd = 0;
     command_fd = lwcli_regist_command("date", "get or set time", date_func);
@@ -142,6 +163,16 @@ int main(void)
 {
     system("stty -icanon");
     system("stty -echo");
+    static const lwcli_opt_t opt = {
+        .malloc = opt_malloc,
+        .free = opt_free,
+        .output = opt_output,
+        .hardware_init = NULL,
+#if (LWCLI_WITH_FILE_SYSTEM == true)
+        .get_file_path = opt_get_file_path,
+#endif
+    };
+    lwcli_hardware_init(&opt);
     lwcli_software_init();
     int command_fd = 0;
     command_fd = lwcli_regist_command("test2", "test command2", test_func);

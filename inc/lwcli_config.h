@@ -89,7 +89,7 @@
 /**
  * @brief 是否启用文件系统风格提示符
  * @note 为 true 时，提示符显示为 用户名:当前路径 $
- * @note 当前路径由用户在 lwcli_port.c 中实现的 lwcli_get_file_path() 返回
+ * @note 当前路径由 opt->get_file_path 返回（可为 NULL，默认 "/"）
  */
 #define LWCLI_WITH_FILE_SYSTEM true
 
