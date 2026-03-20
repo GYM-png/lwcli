@@ -910,7 +910,7 @@ static void lwcil_fix_parameter(command_t *cmd)
         return;
     }
     list_for_each_entry(param, &cmd->para.node, node, parameter_t) {
-        if (prefix_len > 0 && prefix_len < param->len) {
+        if (prefix_len > 0 && (size_t)prefix_len <= param->len) {
             if (memcmp(param->data, prefix, (size_t)prefix_len) == 0) {
                 match_num++;
             }
@@ -919,8 +919,11 @@ static void lwcil_fix_parameter(command_t *cmd)
 
     if (match_num == 0) {
         lwcli_opt_output("\r\n", 2);
-        list_for_each_entry(param, &cmd->para.node, node, parameter_t) {
-            lwcli_printf("%s    ", param->data);
+        if (prefix_len == 0) {
+            /* 用户仅输入 "cmd " 未输入前缀时，列出所有参数 */
+            list_for_each_entry(param, &cmd->para.node, node, parameter_t) {
+                lwcli_printf("%s    ", param->data);
+            }
         }
         #if (LWCLI_WITH_FILE_SYSTEM == true)
         lwcli_opt_output("\r\n", 2);
@@ -941,19 +944,17 @@ static void lwcil_fix_parameter(command_t *cmd)
     }
     else if (match_num == 1) {
         list_for_each_entry(param, &cmd->para.node, node, parameter_t) {
-            if (prefix_len < param->len) {
-                if (memcmp(param->data, prefix, (size_t)prefix_len) == 0) {
-                    memcpy(lwcliObj.inputBuffer + cmd->cmd_len + 1, param->data, param->len);
-                    lwcliObj.inputBufferPos = param->len + cmd->cmd_len + 1;
-                    lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = ' ';
-                    lwcliObj.cursorPos = lwcliObj.inputBufferPos;
-                    lwcli_opt_output(ansi_clear_line, sizeof(ansi_clear_line));
+            if ((size_t)prefix_len <= param->len && memcmp(param->data, prefix, (size_t)prefix_len) == 0) {
+                memcpy(lwcliObj.inputBuffer + cmd->cmd_len + 1, param->data, param->len);
+                lwcliObj.inputBufferPos = param->len + cmd->cmd_len + 1;
+                lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = ' ';
+                lwcliObj.cursorPos = lwcliObj.inputBufferPos;
+                lwcli_opt_output(ansi_clear_line, sizeof(ansi_clear_line));
 #if (LWCLI_WITH_FILE_SYSTEM == true)
-                    lwcli_output_file_path();
+                lwcli_output_file_path();
 #endif  // LWCLI_WITH_FILE_SYSTEM == true
-                    lwcli_opt_output(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
-                    break;
-                }
+                lwcli_opt_output(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
+                break;
             }
         }
     }
@@ -966,7 +967,7 @@ static void lwcil_fix_parameter(command_t *cmd)
         }
 
         list_for_each_entry(param, &cmd->para.node, node, parameter_t) {
-            if (memcmp(param->data, prefix, (size_t)prefix_len) == 0) {
+            if ((size_t)prefix_len <= param->len && memcmp(param->data, prefix, (size_t)prefix_len) == 0) {
                 match_arr[match_index++] = param->data;
             }
         }
