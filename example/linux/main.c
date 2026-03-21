@@ -13,11 +13,11 @@ static void opt_output(const char *s, uint16_t len) {
     if (len == 1) putchar(*s);
     else printf("%.*s", len, s);
 }
-#if (LWCLI_WITH_FILE_SYSTEM == true)
+#if (LWCLI_WITH_FILE_SYSTEM == LWCLI_TRUE)
 static char *opt_get_file_path(void) { return "/"; }
 #endif
 
-#if (LWCLI_PARAMETER_SPLIT == true)
+#if (LWCLI_PARAMETER_SPLIT == LWCLI_TRUE)
 #define LWCLI_STRSTR(n, str) strstr(argv[n], str)
 
 
@@ -103,7 +103,7 @@ int main(void)
         .free = opt_free,
         .output = opt_output,
         .hardware_init = NULL,
-#if (LWCLI_WITH_FILE_SYSTEM == true)
+#if (LWCLI_WITH_FILE_SYSTEM == LWCLI_TRUE)
         .get_file_path = opt_get_file_path,
 #endif
     };

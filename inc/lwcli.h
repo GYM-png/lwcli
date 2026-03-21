@@ -30,7 +30,7 @@ typedef struct lwcli_opt {
     void (*free)(void *ptr);                                         /**< 内存释放 */
     void (*output)(const char *output_string, uint16_t string_len);  /**< 输出字符串到终端 */
     void (*hardware_init)(void);                                     /**< 硬件初始化（可为 NULL）*/
-#if (LWCLI_WITH_FILE_SYSTEM == true)
+#if (LWCLI_WITH_FILE_SYSTEM == LWCLI_TRUE)
     char *(*get_file_path)(void);                                    /**< 获取当前路径（可为 NULL，默认 "/"）*/
 #endif
 } lwcli_opt_t;
@@ -52,7 +52,7 @@ void lwcli_hardware_init(const lwcli_opt_t *opt);
  */
 void lwcli_software_init(void);
 
-#if (LWCLI_PARAMETER_SPLIT == true)
+#if (LWCLI_PARAMETER_SPLIT == LWCLI_TRUE)
 /**
  * @brief 用户命令回调函数类型（参数分割模式）
  * @param argc  传入命令的参数个数（不含命令名本身）
@@ -78,7 +78,7 @@ typedef void (*user_callback_f)(char *argvs);
  */
 int lwcli_regist_command(const char *command, const char *brief, user_callback_f user_callback);
 
-#if (LWCLI_PARAMETER_COMPLETION == true)
+#if (LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE)
 /**
  * @brief 为命令注册参数（用于帮助显示与 Tab 补全）
  * @param command_fd  lwcli_regist_command() 返回的命令描述符

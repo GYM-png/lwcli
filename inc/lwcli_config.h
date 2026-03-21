@@ -12,17 +12,13 @@
 #ifndef __LWCLI_CONFIG_H__
 #define __LWCLI_CONFIG_H__
 
-/* 供预处理器使用的布尔值（开关配置使用 true/false，避免与 stdbool.h 冲突） */
+/* 供预处理器使用的布尔值（开关配置使用 true/false） */
 #ifndef LWCLI_TRUE
 #define LWCLI_TRUE 1
 #endif  // LWCLI_TRUE
 #ifndef LWCLI_FALSE
 #define LWCLI_FALSE 0
 #endif  // LWCLI_FALSE
-#if !defined(__bool_true_false_are_defined)
-#define true LWCLI_TRUE
-#define false LWCLI_FALSE
-#endif  // !defined(__bool_true_false_are_defined)
 
 /**
  * @brief LWCLI 配置
@@ -62,43 +58,43 @@
 
 /**
  * @brief 是否启用参数分割/提取
- * @note true:  回调 (int argc, char *argv[])，自动提取参数
- *       false: 回调 (char *argvs)，传入原始参数字符串
+ * @note 1/true:  回调 (int argc, char *argv[])，自动提取参数
+ *       0/false: 回调 (char *argvs)，传入原始参数字符串
  */
-#define LWCLI_PARAMETER_SPLIT true
+#define LWCLI_PARAMETER_SPLIT LWCLI_TRUE
 
 /**
  * @brief 是否启用参数补全
- * @note 当为 false 或 LWCLI_PARAMETER_SPLIT 为 false 时，参数补全自动关闭。
+ * @note 当为 0/false 或 LWCLI_PARAMETER_SPLIT 为 0/false 时，参数补全自动关闭。
  */
-#define LWCLI_PARAMETER_COMPLETION true
+#define LWCLI_PARAMETER_COMPLETION LWCLI_TRUE
 
-#if (LWCLI_PARAMETER_SPLIT == false)
+#if (LWCLI_PARAMETER_SPLIT == LWCLI_FALSE)
 #undef LWCLI_PARAMETER_COMPLETION
-#define LWCLI_PARAMETER_COMPLETION false
-#endif  // LWCLI_PARAMETER_SPLIT == false
+#define LWCLI_PARAMETER_COMPLETION LWCLI_FALSE
+#endif  // LWCLI_PARAMETER_SPLIT == LWCLI_FALSE
 
-#if (LWCLI_PARAMETER_COMPLETION == true)
+#if (LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE)
 /**
  * @brief 存储已注册参数字符串的内存池大小
  * @note 使用固定大小池以避免频繁小块动态分配
  */
 #define LWCLI_PARAMETER_BUFFER_POOL_SIZE 512
-#endif  // LWCLI_PARAMETER_COMPLETION == true
+#endif  // LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE
 
 /**
  * @brief 是否启用文件系统风格提示符
- * @note 为 true 时，提示符显示为 用户名:当前路径 $
+ * @note 为 1/true 时，提示符显示为 用户名:当前路径 $
  * @note 当前路径由 opt->get_file_path 返回（可为 NULL，默认 "/"）
  */
-#define LWCLI_WITH_FILE_SYSTEM true
+#define LWCLI_WITH_FILE_SYSTEM LWCLI_TRUE
 
-#if (LWCLI_WITH_FILE_SYSTEM == true)
+#if (LWCLI_WITH_FILE_SYSTEM == LWCLI_TRUE)
 /**
  * @brief 提示符中显示的用户名
  */
 #define LWCLI_USER_NAME "lwcli@STM32"
-#endif  // LWCLI_WITH_FILE_SYSTEM == true
+#endif  // LWCLI_WITH_FILE_SYSTEM == LWCLI_TRUE
 
 
 #endif  // __LWCLI_CONFIG_H__
