@@ -19,13 +19,14 @@ Current version: `V0.0.4`
 ## Features
 
 - **Lightweight design**: Minimal resource usage, ideal for embedded systems
-- **Dynamic command registration**: Register commands along with brief help, **usage**, and **detailed description**
-- **Tab auto-completion**: Supports command prefix completion; press Tab to show matching suggestions
+- **Command & parameter registration**: Dynamically register commands and parameters with brief help, and **detailed description**
+- **Tab completion**: Supports command prefix and parameter completion; press Tab to show matching suggestions
 - **Parameter parsing**: Automatically splits parameters, supports quoted arguments (up to `LWCLI_RECEIVE_BUFFER_SIZE` length)
 - **Command history**: Supports up to `LWCLI_HISTORY_COMMAND_NUM` entries; navigate with up/down arrow keys
 - **Cursor editing**: Supports left/right arrow keys for cursor movement, Backspace/Delete for character removal
 - **File-system-style prompt**: When `LWCLI_WITH_FILE_SYSTEM` is enabled, displays `username:path $` (similar to Linux shell)
 - **Cross-platform**: Function pointer injection via `lwcli_opt_t` adapts to different MCUs, serial, or USB without port files
+- **Zero malloc at runtime**: Tab completion, parameter splitting, etc. allocate from a dynamic memory pool; no heap fragmentation
 - **FreeRTOS integration**: Provides a dedicated task for input/output handling
 - **Enhanced help system**: `help` lists all commands; `help <cmd>` shows detailed usage and description
 
@@ -90,8 +91,10 @@ The `lwcli_config.h` file defines the following configuration parameters (switch
 | `LWCLI_BRIEF_MAX_LENGTH`       | 100           | Maximum help string length                |
 | `LWCLI_RECEIVE_BUFFER_SIZE`       | 50            | Receive buffer size                       |
 | `LWCLI_HISTORY_COMMAND_NUM`       | 10            | Maximum number of history commands (0 to disable) |
+| `LWCLI_DYNAMIC_POOL_SIZE`         | 256           | Runtime dynamic pool size (Tab completion, parameter splitting, etc.) |
 | `LWCLI_PARAMETER_SPLIT`           | true          | Split parameters: true = `(int argc, char *argv[])`, false = `(char *argvs)` |
 | `LWCLI_PARAMETER_COMPLETION`      | true          | Enable parameter completion (requires `LWCLI_PARAMETER_SPLIT=true`) |
+| `LWCLI_STATIC_POOL_SIZE`          | 512           | Parameter registration pool size (only when parameter completion enabled) |
 | `LWCLI_WITH_FILE_SYSTEM`              | true                  | Enable file system prompt                |
 | `LWCLI_USER_NAME`                     | "lwcli@STM32"         | Username (only valid when file system is enabled) |
 
@@ -104,6 +107,10 @@ The `lwcli_config.h` file defines the following configuration parameters (switch
 > **Parameter Mode**:  
 > - `LWCLI_PARAMETER_SPLIT = true`: Callback signature is `(int argc, char *argv[])`, parameters are auto-split.  
 > - `LWCLI_PARAMETER_SPLIT = false`: Callback signature is `(char *argvs)`, raw argument string is passed, parameter completion is disabled.
+
+> **Memory Pools**:  
+> - `LWCLI_DYNAMIC_POOL_SIZE`: Runtime allocations (Tab completion, parameter splitting) come from this pool; no malloc at runtime, no heap fragmentation.  
+> - `LWCLI_STATIC_POOL_SIZE`: Used for parameter registration; only when `LWCLI_PARAMETER_COMPLETION=true`.
 
 Modify these parameters to suit your needs, keeping memory constraints in mind.
 

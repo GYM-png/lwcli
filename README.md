@@ -19,13 +19,14 @@
 ## 特性
 
 - **轻量级设计**：占用资源少，适合嵌入式系统
-- **动态命令注册**：支持注册命令、简要帮助、**用法（usage）** 和 **详细说明（description）**
-- **Tab 自动补全**：支持命令名前缀补全，Tab 显示匹配列表
+- **命令与参数注册**：动态注册命令及参数，支持简要帮助 和 **详细说明（description）**
+- **Tab 补全**：支持命令名前缀补全、参数补全，Tab 显示匹配列表
 - **参数解析**：自动分割参数，支持引号包裹参数（支持最多 `LWCLI_RECEIVE_BUFFER_SIZE` 长度）
 - **命令历史记录**：支持最多 `LWCLI_HISTORY_COMMAND_NUM` 条记录，使用上下箭头键浏览
 - **光标编辑**：支持左右方向键移动光标、Backspace/Delete 删除字符
 - **文件系统风格提示符**：启用 `LWCLI_WITH_FILE_SYSTEM` 后显示用户名:路径 $ （类似 Linux shell）
 - **跨平台**：通过 `lwcli_opt_t` 函数指针注入适配不同 MCU/串口/USB，无需移植文件
+- **运行时零 malloc**：Tab 补全、参数分割等运行时分配全部来自 dynamic 内存池，避免内存碎片
 - **FreeRTOS 集成**：提供独立任务处理输入输出
 - **增强的帮助系统**：支持 `help` 列出所有命令、`help <cmd>` 查看详细用法和说明
 
@@ -90,8 +91,10 @@ lwcli_software_init();
 | `LWCLI_BRIEF_MAX_LENGTH`        | 100              | 帮助字符串最大长度                |
 | `LWCLI_RECEIVE_BUFFER_SIZE`        | 50               | 接收缓冲区大小                    |
 | `LWCLI_HISTORY_COMMAND_NUM`        | 10               | 历史命令最大数量（0 禁用历史记录）|
+| `LWCLI_DYNAMIC_POOL_SIZE`        | 256              | 运行时动态内存池大小（Tab 补全、参数分割等）|
 | `LWCLI_PARAMETER_SPLIT`          | true              | 是否分割参数：true 为 `(int argc, char *argv[])`，false 为 `(char *argvs)` |
 | `LWCLI_PARAMETER_COMPLETION`     | true              | 是否启用参数补全（需 `LWCLI_PARAMETER_SPLIT=true`）|
+| `LWCLI_STATIC_POOL_SIZE`         | 512              | 参数注册内存池大小（仅参数补全启用时有效）|
 | `LWCLI_WITH_FILE_SYSTEM`          | true              | 是否启用文件系统提示符     |
 | `LWCLI_USER_NAME`                 | "lwcli@STM32"     | 用户名（仅在文件系统启用时有效）|
 
@@ -104,6 +107,10 @@ lwcli_software_init();
 > **参数模式**：  
 > - `LWCLI_PARAMETER_SPLIT = true`：回调签名为 `(int argc, char *argv[])`，自动分割参数。  
 > - `LWCLI_PARAMETER_SPLIT = false`：回调签名为 `(char *argvs)`，传入原始参数字符串，参数补全自动关闭。
+
+> **内存池**：  
+> - `LWCLI_DYNAMIC_POOL_SIZE`：运行时分配（Tab 补全、参数分割）均从此池获取，运行期间不调用 malloc，避免内存碎片。  
+> - `LWCLI_STATIC_POOL_SIZE`：参数注册时使用，仅在 `LWCLI_PARAMETER_COMPLETION=true` 时有效。
 
 修改这些参数以适配您的需求，但需注意内存占用。
 
