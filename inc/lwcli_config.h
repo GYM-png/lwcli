@@ -74,20 +74,18 @@
 #define LWCLI_PARAMETER_COMPLETION LWCLI_FALSE
 #endif  // LWCLI_PARAMETER_SPLIT == LWCLI_FALSE
 
-#if (LWCLI_PARAMETER_SPLIT == LWCLI_TRUE)
 /**
- * @brief 参数分割时 argv 内存池大小
- * @note 用于临时存储参数分割后的参数字符串
+ * @brief 运行时动态内存池大小
+ * @note 用于 Tab 补全、参数分割等运行时临时分配
  */
-#define LWCLI_ARGV_POOL_SIZE 256
-#endif  // LWCLI_PARAMETER_SPLIT == LWCLI_TRUE
+#define LWCLI_DYNAMIC_POOL_SIZE 256
 
 #if (LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE)
 /**
  * @brief 存储已注册参数字符串的内存池大小
  * @note 用于存储已注册参数字符串
  */
-#define LWCLI_PARAMETER_BUFFER_POOL_SIZE 512
+#define LWCLI_STATIC_POOL_SIZE 512
 #endif  // LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE
 
 /**

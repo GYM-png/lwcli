@@ -18,7 +18,6 @@
 #include "stdarg.h"
 #include "ctype.h"
 
-#if (LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE || LWCLI_PARAMETER_SPLIT == LWCLI_TRUE)
 #define LWCLI_MEMPOOL_DEFINE(name, buffer_size) \
     typedef struct { \
         char data[buffer_size]; \
@@ -40,7 +39,8 @@ static inline char *lwcli_pool_alloc(char *data, uint32_t *pool_size, uint32_t *
     }
     return ptr;
 }
-#endif  // LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE || LWCLI_PARAMETER_SPLIT == LWCLI_TRUE
+
+LWCLI_MEMPOOL_DEFINE(dynamic, LWCLI_DYNAMIC_POOL_SIZE);
 
 #if (LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE)
 typedef struct parameter_list
@@ -51,12 +51,8 @@ typedef struct parameter_list
     list_node_t node;
 } parameter_t;
 
-LWCLI_MEMPOOL_DEFINE(parameter, LWCLI_PARAMETER_BUFFER_POOL_SIZE);
+LWCLI_MEMPOOL_DEFINE(parameter, LWCLI_STATIC_POOL_SIZE);
 #endif  // LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE
-
-#if (LWCLI_PARAMETER_SPLIT == LWCLI_TRUE)
-LWCLI_MEMPOOL_DEFINE(argv, LWCLI_ARGV_POOL_SIZE);
-#endif  // LWCLI_PARAMETER_SPLIT == LWCLI_TRUE
 
 typedef struct command
 {
@@ -396,25 +392,23 @@ static char *lwcli_parameter_malloc(uint32_t size)
 }
 #endif  // LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE
 
-#if (LWCLI_PARAMETER_SPLIT == LWCLI_TRUE)
 /**
- * @brief 从 argv 内存池分配（用于回调参数的字符串，避免碎片）
- * @param size 字符串长度
+ * @brief 从 dynamic 内存池分配（用于 Tab 补全、参数分割等运行时临时分配）
+ * @param size 分配长度
  * @return 指针，失败返回 NULL
  */
-static char *lwcli_argv_malloc(uint32_t size)
+static char *lwcli_dynamic_malloc(uint32_t size)
 {
-    return LWCLI_POOL_ALLOC(argv, size);
+    return LWCLI_POOL_ALLOC(dynamic, size);
 }
 
 /**
- * @brief 释放 argv 内存池（回调返回后调用，重置池供下次使用）
+ * @brief 释放 dynamic 内存池（使用完毕后调用，重置池供下次使用）
  */
-static void lwcli_argv_free(void)
+static void lwcli_dynamic_free(void)
 {
-    argv_pool.pos = 0;
+    dynamic_pool.pos = 0;
 }
-#endif  // LWCLI_PARAMETER_SPLIT == LWCLI_TRUE
 
 /**
  * @brief 帮助命令
@@ -691,17 +685,16 @@ static void lwcli_process_command(char *command)
 #endif  // LWCLI_WITH_FILE_SYSTEM == LWCLI_TRUE
                 return;
             }
-            char **parameterArray = (char **)lwcli_opt_malloc(sizeof(char *) * parameter_num);
+            char **parameterArray = (char **)lwcli_dynamic_malloc(sizeof(char *) * parameter_num);
             if (parameterArray == NULL) {
                 lwcli_printf("error malloc\r\n");
                 return;
             }
             uint8_t findParameterNum = lwcli_find_parameters(cmdParameter + cmd->cmd_len, parameterArray, parameter_num);
             cmd->callback(findParameterNum, parameterArray);
-            lwcli_argv_free();  /* 释放 argv 池（参数字符串来自 argv 池）*/
-            lwcli_opt_free(parameterArray);
+            lwcli_dynamic_free();  /* 释放 dynamic 池 */
 #if (LWCLI_WITH_FILE_SYSTEM == LWCLI_TRUE)
-                lwcli_output_file_path();
+            lwcli_output_file_path();
 #endif  // LWCLI_WITH_FILE_SYSTEM == LWCLI_TRUE
             return;
 #else  // LWCLI_PARAMETER_SPLIT == LWCLI_TRUE
@@ -770,7 +763,7 @@ static uint8_t lwcli_find_parameters(const char *argv_str, char **parameter_arry
     uint8_t found_num = 0;
     bool in_quotes = false; // 是否处于引号中
 
-    uint8_t *index = (uint8_t*) lwcli_opt_malloc(sizeof(uint8_t) * (parameter_num + 1));  // 增加一个元素用于最后一个参数
+    uint8_t *index = (uint8_t*) lwcli_dynamic_malloc(sizeof(uint8_t) * (parameter_num + 1));  // 增加一个元素用于最后一个参数
     if (index == NULL) {
         lwcli_printf("error malloc\r\n");
         return 0;
@@ -795,18 +788,14 @@ static uint8_t lwcli_find_parameters(const char *argv_str, char **parameter_arry
         end = (i + 1 < found_num) ? index[i + 1] - 1: len;  // 确保最后一个参数处理正确
         uint8_t param_len = end - start;
 
-        parameter_arry[i] = (char *)lwcli_argv_malloc(param_len + 1);  /* 从 argv 池分配 */
+        parameter_arry[i] = (char *)lwcli_dynamic_malloc(param_len + 1);
         if (parameter_arry[i] == NULL) {
-            lwcli_printf("error malloc\r\n");
-            lwcli_argv_free();  /* 回滚已分配 */
-            lwcli_opt_free(index);
-            return 0;
+            return 0;  /* 由调用方 lwcli_process_command 的 lwcli_dynamic_free 统一释放 */
         }
         memcpy(parameter_arry[i], argv_str + start, param_len);
         parameter_arry[i][param_len] = '\0';  // 添加字符串结束符 避免乱码
     }
-
-    lwcli_opt_free(index);
+    // 此处不能释放 index 内存，因为参数可能被用户回调函数使用
     return found_num;
 }
 #endif  // LWCLI_PARAMETER_SPLIT == LWCLI_TRUE
@@ -890,7 +879,7 @@ static void lwcli_fix_command(void)
     else {
         char **match_arr = NULL;
         uint16_t match_index = 0;
-        match_arr = (char **)lwcli_opt_malloc(sizeof(char *) * match_num);
+        match_arr = (char **)lwcli_dynamic_malloc(sizeof(char *) * match_num);
         if (match_arr == NULL) {
             return;
         }
@@ -923,7 +912,7 @@ static void lwcli_fix_command(void)
         lwcli_opt_output(lwcliObj.ouputBuffer, output_len);
         #endif  // LWCLI_WITH_FILE_SYSTEM == LWCLI_TRUE
 
-        lwcli_opt_free(match_arr);
+        lwcli_dynamic_free();
     }
 }
 
@@ -996,7 +985,7 @@ static void lwcli_fix_parameter(command_t *cmd)
     else {
         char **match_arr = NULL;
         uint16_t match_index = 0;
-        match_arr = (char **)lwcli_opt_malloc(sizeof(char *) * match_num);
+        match_arr = (char **)lwcli_dynamic_malloc(sizeof(char *) * match_num);
         if (match_arr == NULL) {
             return;
         }
@@ -1028,7 +1017,7 @@ static void lwcli_fix_parameter(command_t *cmd)
         lwcli_opt_output(lwcliObj.ouputBuffer, output_len);
         #endif  // LWCLI_WITH_FILE_SYSTEM == LWCLI_TRUE
 
-        lwcli_opt_free(match_arr);
+        lwcli_dynamic_free();
     }
 }
 #endif  // LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE
