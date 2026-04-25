@@ -157,6 +157,7 @@ static void lwcli_fix_command(void);
 
 #if (LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE)
 static void lwcli_fix_parameter(command_t *cmd);
+static void lwcli_get_current_parameter_prefix(command_t *cmd, const char **prefix, int *prefix_len, uint16_t *prefix_start_pos);
 static char *lwcli_parameter_malloc(uint32_t size);
 #endif  // LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE
 
@@ -918,6 +919,82 @@ static void lwcli_fix_command(void)
 
 #if (LWCLI_PARAMETER_COMPLETION == LWCLI_TRUE)
 /**
+ * @brief 获取当前光标位置所在“参数token”的前缀
+ * @details
+ *  - 支持双引号包裹：token 内部的空格不参与分隔
+ *  - 支持多个参数：只匹配“最后一个token”的前缀
+ *  - 若光标位于token后的空格处，则当前前缀视为长度为0
+ *
+ * @param cmd 参数所属的命令
+ * @param prefix 输出：指向当前token前缀起始地址
+ * @param prefix_len 输出：当前token前缀长度（不含分隔空格；尾随空格场景为0）
+ * @param prefix_start_pos 输出：token在 inputBuffer 中的起始下标
+ */
+static void lwcli_get_current_parameter_prefix(command_t *cmd, const char **prefix, int *prefix_len, uint16_t *prefix_start_pos)
+{
+    const char *buf = lwcliObj.inputBuffer;
+    uint16_t cursor = lwcliObj.inputBufferPos;
+    uint8_t cmd_end = (size_t)cmd->cmd_len;
+
+    /* 保持与原实现一致：cmd后无字符时 prefix_len 为负，后续逻辑会走 prefix_len < 0 分支补空格 */
+    if (cursor <= cmd_end) {
+        *prefix_start_pos = cmd_end + 1;
+        *prefix = buf + cmd_end + 1;
+        *prefix_len = (int)cursor - (int)cmd_end - 1;
+        return;
+    }
+
+    /* 1) 判断光标处是否仍在引号中；若不在引号中且末尾有空格，则当前token前缀为空 */
+    bool in_quotes = false;
+    for (uint16_t i = cmd_end; i < cursor; i++) {
+        if (buf[i] == '\"') {
+            in_quotes = !in_quotes;
+        }
+    }
+    if (!in_quotes) {
+        uint16_t end = cursor;
+        while (end > cmd_end && buf[end - 1] == ' ') {
+            end--;
+        }
+        if (end < cursor) {
+            *prefix_start_pos = cursor;
+            *prefix = buf + cursor;
+            *prefix_len = 0;
+            return;
+        }
+    }
+
+    /* 2) 跳过命令后的前导空格，找到token起点 */
+    uint16_t start = cmd_end;
+    while (start < cursor && buf[start] == ' ') {
+        start++;
+    }
+    if (start >= cursor) {
+        *prefix_start_pos = cursor;
+        *prefix = buf + cursor;
+        *prefix_len = 0;
+        return;
+    }
+
+    /* 3) 扫描分隔位置：空格且不在引号中，且后一个不是空格 */
+    uint16_t token_start = start;
+    in_quotes = false;
+    for (uint16_t i = start; i < cursor; i++) {
+        char c = buf[i];
+        if (c == '\"') {
+            in_quotes = !in_quotes;
+        }
+        if (!in_quotes && c == ' ' && (i + 1) < cursor && buf[i + 1] != ' ') {
+            token_start = i + 1;
+        }
+    }
+
+    *prefix_start_pos = token_start;
+    *prefix = buf + token_start;
+    *prefix_len = (int)(cursor - token_start);
+}
+
+/**
  * @brief 补全参数
  * @param cmd 参数所属的命令
  */
@@ -926,16 +1003,18 @@ static void lwcli_fix_parameter(command_t *cmd)
     if (list_empty(&cmd->para.node)) {
         return;
     }
-    const char *prefix = lwcliObj.inputBuffer + cmd->cmd_len + 1;
-    int prefix_len = lwcliObj.inputBufferPos - cmd->cmd_len - 1;
+    const char *prefix = NULL;
+    int prefix_len = 0;
+    uint16_t prefix_start_pos = 0;
+    lwcli_get_current_parameter_prefix(cmd, &prefix, &prefix_len, &prefix_start_pos);
     uint16_t match_num = 0;
     parameter_t *param = NULL;
     if (!lwcliObj.inputBufferPos) {
         return;
     }
     list_for_each_entry(param, &cmd->para.node, node, parameter_t) {
-        if (prefix_len > 0 && (size_t)prefix_len <= param->len) {
-            if (memcmp(param->data, prefix, (size_t)prefix_len) == 0) {
+        if (prefix_len > 0 && (uint16_t)prefix_len <= param->len) {
+            if (memcmp(param->data, prefix, (uint16_t)prefix_len) == 0) {
                 match_num++;
             }
         }
@@ -969,8 +1048,8 @@ static void lwcli_fix_parameter(command_t *cmd)
     else if (match_num == 1) {
         list_for_each_entry(param, &cmd->para.node, node, parameter_t) {
             if ((size_t)prefix_len <= param->len && memcmp(param->data, prefix, (size_t)prefix_len) == 0) {
-                memcpy(lwcliObj.inputBuffer + cmd->cmd_len + 1, param->data, param->len);
-                lwcliObj.inputBufferPos = param->len + cmd->cmd_len + 1;
+                memcpy(lwcliObj.inputBuffer + prefix_start_pos, param->data, param->len);
+                lwcliObj.inputBufferPos = prefix_start_pos + param->len;
                 lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = ' ';
                 lwcliObj.cursorPos = lwcliObj.inputBufferPos;
                 lwcli_opt_output(ansi_clear_line, sizeof(ansi_clear_line));

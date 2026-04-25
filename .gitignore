@@ -1,4 +1,5 @@
 build/
 example/linux/build
+example/linux/test
 cppcheck_reports_*/
 docs/
