@@ -290,11 +290,11 @@ int lwcli_regist_command(const char *command, const char *brief, user_callback_f
     lwcli_assert_return(command != NULL, -1);
     lwcli_assert_return(brief != NULL, -1);
     lwcli_assert_return(user_callback != NULL, -1);
-    if (strlen(command) > LWCLI_COMMAND_STR_MAX_LENGTH) {
+    if (strlen(command) >= LWCLI_COMMAND_STR_MAX_LENGTH) {
         lwcli_printf("command string too long please modify LWCLI_COMMAND_STR_MAX_LENGTH \r\n");
         return -1;
     }
-    if (strlen(brief) > LWCLI_BRIEF_MAX_LENGTH) {
+    if (strlen(brief) >= LWCLI_BRIEF_MAX_LENGTH) {
         lwcli_printf("help string too long please modify LWCLI_BRIEF_MAX_LENGTH \r\n");
         return -1;
     }
@@ -446,8 +446,7 @@ static void lwcli_help(int argc, char *argv[])
         cmd = NULL;
         int found = 0;
         list_for_each_entry(cmd, &lwcliObj.command->node, node, command_t) {
-            uint16_t cmp_len = (command_len > cmd->cmd_len) ? cmd->cmd_len : command_len;
-            if (cmp_len > 0 && memcmp(cmd->command, argv[0], cmp_len) == 0) {
+            if (command_len == cmd->cmd_len && memcmp(cmd->command, argv[0], command_len) == 0) {
                 found = 1;
                 break;
             }
@@ -506,8 +505,7 @@ static void lwcli_help(char *argvs)
         uint16_t search_len = (uint16_t)(p - search);
         int found = 0;
         list_for_each_entry(cmd, &lwcliObj.command->node, node, command_t) {
-            uint16_t cmp_len = (search_len > cmd->cmd_len) ? cmd->cmd_len : search_len;
-            if (cmp_len > 0 && memcmp(cmd->command, search, cmp_len) == 0) {
+            if (search_len == cmd->cmd_len && memcmp(cmd->command, search, search_len) == 0) {
                 found = 1;
                 break;
             }
@@ -559,6 +557,7 @@ void lwcli_process_receive_char(char recv_char)
 {
     static uint8_t ansiKey = 0;
     if (recv_char == '\r' || recv_char == '\n') {
+        ansiKey = 0;
         lwcliObj.inputBuffer[lwcliObj.inputBufferPos] = '\0';
         lwcli_opt_output("\r\n", 2);
         lwcli_process_command(lwcliObj.inputBuffer);
@@ -886,7 +885,8 @@ static void lwcli_fix_command(void)
         }
 
         list_for_each_entry(cmd, &lwcliObj.command->node, node, command_t) {
-            if (memcmp(cmd->command, prefix, lwcliObj.inputBufferPos) == 0) {
+            if (lwcliObj.inputBufferPos < cmd->cmd_len &&
+                memcmp(cmd->command, prefix, lwcliObj.inputBufferPos) == 0) {
                 match_arr[match_index++] = cmd->command;
             }
         }
@@ -1031,14 +1031,14 @@ static void lwcli_fix_parameter(command_t *cmd)
         #if (LWCLI_WITH_FILE_SYSTEM == LWCLI_TRUE)
         lwcli_opt_output("\r\n", 2);
         lwcli_output_file_path();
-        if (prefix_len < 0){
+        if (prefix_len < 0 && lwcliObj.inputBufferPos < (uint16_t)(sizeof(lwcliObj.inputBuffer) - 1)) {
             lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = ' ';
         }
         lwcliObj.cursorPos = lwcliObj.inputBufferPos;
         lwcli_opt_output(lwcliObj.inputBuffer, lwcliObj.inputBufferPos);
         #else
         lwcli_opt_output("\r\n", 2);
-        if (prefix_len < 0){
+        if (prefix_len < 0 && lwcliObj.inputBufferPos < (uint16_t)(sizeof(lwcliObj.inputBuffer) - 1)) {
             lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = ' ';
         }
         lwcliObj.cursorPos = lwcliObj.inputBufferPos;
@@ -1048,6 +1048,10 @@ static void lwcli_fix_parameter(command_t *cmd)
     else if (match_num == 1) {
         list_for_each_entry(param, &cmd->para.node, node, parameter_t) {
             if ((size_t)prefix_len <= param->len && memcmp(param->data, prefix, (size_t)prefix_len) == 0) {
+                /* 确保补全后加空格不越界 */
+                if (prefix_start_pos + param->len + 1 >= sizeof(lwcliObj.inputBuffer)) {
+                    break;
+                }
                 memcpy(lwcliObj.inputBuffer + prefix_start_pos, param->data, param->len);
                 lwcliObj.inputBufferPos = prefix_start_pos + param->len;
                 lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = ' ';
@@ -1082,7 +1086,8 @@ static void lwcli_fix_parameter(command_t *cmd)
             lwcli_opt_output("    ", 4);
         }
         
-        while (prefix_len < match_max_len) {
+        while (prefix_len < match_max_len &&
+               lwcliObj.inputBufferPos < (uint16_t)(sizeof(lwcliObj.inputBuffer) - 1)) {
             lwcliObj.inputBuffer[lwcliObj.inputBufferPos++] = match_arr[0][prefix_len++];
         }
         lwcliObj.cursorPos = lwcliObj.inputBufferPos;
